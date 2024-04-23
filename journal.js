@@ -1,43 +1,75 @@
 const fs = require('fs');
 const path = require('path');
-const prompt = require('electron-prompt');
 const marked = require('marked');
 let entries = [];
 let tags = {};
 
+const container = document.getElementById('entriesContainer');
 const entriesFile = path.join(__dirname, 'user_entries', 'entries.json');
 const tagsFile = path.join(__dirname, 'user_entries', 'tags.json');
 const entriesFolder = path.join(__dirname, 'user_entries');
+var modal = document.getElementById("myModal");
+var textarea = document.getElementById("modalTextarea");
+var modalTagsInput = document.getElementById('modalTagsInput');
+var saveButton = document.getElementById("saveButton");
+var mouseDownInside = false;
+modal.addEventListener('mousedown', function(event) {
+    mouseDownInside = (event.target !== modal);
+});
+window.addEventListener('mouseup', function(event) {
+    if (event.target === modal && !mouseDownInside) {
+        modal.style.display = "none";
+    }
+    mouseDownInside = false;
+});
+function toggleReplyInput(index) {
+    const replyInputs = document.querySelectorAll('.reply-input');
+    const addReplyButtons = document.querySelectorAll('.add-reply');
+    replyInputs[index].style.display = replyInputs[index].style.display === 'block' ? 'none' : 'block';
+    addReplyButtons[index].style.display = addReplyButtons[index].style.display === 'block' ? 'none' : 'block';
+}
 
-// Load entries from entries.json
+// Load local entries and tags
 if (fs.existsSync(entriesFile)) {
     const data = JSON.parse(fs.readFileSync(entriesFile, 'utf-8'));
     entries = data.map(entry => {
         const entryText = fs.readFileSync(path.join(entriesFolder, entry.fileName), 'utf-8');
-        return { ...entry, text: entryText };
+        return { ...entry};
     });
 }
-// Load tags from tags.json
 if (fs.existsSync(tagsFile)) {
     const data = JSON.parse(fs.readFileSync(tagsFile, 'utf-8'));
     tags = data;
 }
-renderAll();
-
-// Create directory if it doesn't exist
 if (!fs.existsSync(entriesFolder)){
     fs.mkdirSync(entriesFolder);
 }
+renderAll();
 
+
+function addReply(parentFileName, replyText) {
+    const entryDate = new Date().toLocaleString();
+    const fileName = entryDate.replace(/:/g, '.').replace(/\//g, '-') + '.md';
+    const parentFile = entries.find(entry => entry.fileName === parentFileName);
+    parentFile.replies.push(fileName);
+    fs.writeFileSync(path.join(entriesFolder, fileName), replyText);
+    const newEntry = { fileName, date: entryDate, tags: [], parent: parentFile.fileName, replies: [] };
+    entries.push(newEntry);
+    renderAll();
+    fs.writeFileSync(entriesFile, JSON.stringify(entries));
+}
 function addEntry() {
     const entryText = document.getElementById('entryInput').value;
+    if (!entryText.trim()) {
+        return;
+    }
     const entryTags = document.getElementById('tagInput').value.split(',').map(tag => tag.trim()).filter(tag => tag);
     const entryDate = new Date().toLocaleString();
 
     // Save entry as .md file
     const fileName = entryDate.replace(/:/g, '.').replace(/\//g, '-') + '.md';
     fs.writeFileSync(path.join(entriesFolder, fileName), entryText);
-    const newEntry = { fileName, date: entryDate, tags: []};
+    const newEntry = { fileName, date: entryDate, tags: [], parent: "", replies: [] };
     entryTags.forEach(tag => {
         const tagParts = tag.split('/');
         let currentTag = '';
@@ -62,21 +94,110 @@ function addEntry() {
     fs.writeFileSync(entriesFile, JSON.stringify(entries));
     fs.writeFileSync(tagsFile, JSON.stringify(tags));
 }
+function editEntry(entryText, entry) {
+    modal.style.display = "block";
+    textarea.value = entryText;
+
+    if (entry.parent === "") {
+        modalTagsInput.style.display = 'block';
+        modalTagsInput.value = entry.tags.join(', ');
+    } else {
+        modalTagsInput.style.display = 'none';
+    }
+
+    saveButton.onclick = function() {
+        const newText = textarea.value;
+        if (!newText.trim()) {
+            return;
+        }
+        fs.writeFileSync(path.join(entriesFolder, entry.fileName), newText);
+    
+        // Update tags if it's not a reply
+        if (entry.parent === "") {
+            const newTags = modalTagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag);
+            const oldTags = [...entry.tags];
+            entry.tags = [];
+            newTags.forEach(tag => {
+                const tagParts = tag.split('/');
+                let currentTag = '';
+                for (let part of tagParts) {
+                    currentTag += (currentTag ? '/' : '') + part;
+                    if (!entry.tags.includes(currentTag)) {
+                        entry.tags.push(currentTag);
+                    }
+                    if (!tags[currentTag]) {
+                        tags[currentTag] = [];
+                    }
+                    if (!tags[currentTag].includes(entry.fileName)) {
+                        tags[currentTag].push(entry.fileName);
+                    }
+                }
+            });
+            // Remove entry from tags that are not in newTags
+            oldTags.forEach(tag => {
+                if (!newTags.includes(tag)) {
+                    const index = tags[tag].indexOf(entry.fileName);
+                    if (index > -1) {
+                        tags[tag].splice(index, 1);
+                    }
+                    // If the array for this tag is empty, delete the key from the tags object
+                    if (tags[tag].length === 0) {
+                        delete tags[tag];
+                    }
+                }
+            });
+        }
+        
+        modal.style.display = "none";
+        fs.writeFileSync(entriesFile, JSON.stringify(entries));
+        fs.writeFileSync(tagsFile, JSON.stringify(tags));
+        renderAll();
+    };
+}
 
 function renderEntries(filterTags = []) {
-    const container = document.getElementById('entriesContainer');
     container.innerHTML = '';
-    entries.filter(entry => filterTags.length === 0 || filterTags.every(tag => entry.tags.includes(tag)))    
+    entries.filter(entry => entry.parent === "" && (filterTags.length === 0 || filterTags.every(tag => entry.tags.includes(tag))))    
     .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .forEach(entry => {
+    .forEach((entry, index) => {
         const entryText = fs.readFileSync(path.join(entriesFolder, entry.fileName), 'utf-8');
 
         const entryElement = document.createElement('div');
-        entryElement.className = 'p-4 border mb-2 flex justify-between items-center';
-        
+        entryElement.className = 'entry-element p-4 border mb-2';
+
+        const parentDiv = document.createElement('div');
+        parentDiv.className = 'parent-div';
+
+        const textDiv = document.createElement('div');
+        textDiv.className = 'text-div';
+
         const textElement = document.createElement('div');
-        textElement.innerHTML = marked.parse(entryText); // Convert markdown to HTML
-        entryElement.appendChild(textElement);
+        textElement.innerHTML = marked.parse(entryText);
+        textDiv.appendChild(textElement);
+
+        //Reply input
+        const replyInput = document.createElement('textarea');
+        replyInput.type = 'text';
+        replyInput.placeholder = 'Write a reply...';
+        replyInput.className = 'mt-2 reply-input border';
+        textDiv.appendChild(replyInput);
+
+        const addReplyButton = document.createElement('button');
+        addReplyButton.textContent = 'Add Reply';
+        addReplyButton.className = 'add-reply bg-blue-500 hover:bg-blue-700 text-white mt-2';
+        addReplyButton.onclick = () => {
+            if(!replyInput.value.trim()){
+                return;
+            }
+            addReply(entry.fileName, replyInput.value);
+            replyInput.value = '';
+        };
+        textDiv.appendChild(addReplyButton);
+
+        parentDiv.appendChild(textDiv);
+
+        const utilitiesDiv = document.createElement('div');
+        utilitiesDiv.className = 'utilities-div mt-2';
         
         const tagsElement = document.createElement('div');
         tagsElement.className = 'entry-tags-container';
@@ -86,52 +207,41 @@ function renderEntries(filterTags = []) {
             tagElement.textContent = tag;
             tagsElement.appendChild(tagElement);
         });
+        utilitiesDiv.appendChild(tagsElement);
         
         const dateElement = document.createElement('span');
-        dateElement.textContent = ` - ${entry.date}`;
-        dateElement.style.fontSize = '0.75rem';
-        dateElement.style.color = '#6b7280';
-        entryElement.appendChild(dateElement);
+        dateElement.textContent = `${entry.date}`;
+        dateElement.className = 'date-element';
+        utilitiesDiv.appendChild(dateElement);
         
-        entryElement.appendChild(tagsElement);
+        //Reply button
+        const replyButton = document.createElement('button');
+        replyButton.textContent = 'Reply';
+        replyButton.className = 'reply-button';
+        replyButton.onclick = () => toggleReplyInput(index);
+        utilitiesDiv.appendChild(replyButton);
 
-        // Add edit button
+        // Edit button
         const editButton = document.createElement('button');
         editButton.textContent = 'Edit';
+        editButton.style.height = '32px';
         editButton.onclick = async () => {
-            const result = await prompt({
-                title: 'Edit Entry',
-                label: 'Enter new text:',
-                value: entryText,
-                inputAttrs: {
-                    type: 'text'
-                },
-                type: 'input'
-            });
-
-            if (result !== null) {
-                const newText = result;
-                // Update markdown file
-                fs.writeFileSync(path.join(entriesFolder, entry.fileName), newText);
-                renderAll();
-            }
+            editEntry(entryText, entry);
         };
-        entryElement.appendChild(editButton);
+        utilitiesDiv.appendChild(editButton);
 
-        // Add delete button
+        // Delete button
         const deleteButton = document.createElement('button');
         deleteButton.textContent = 'Delete';
+        deleteButton.style.height = '32px';
         deleteButton.onclick = () => {
             // Remove markdown file
             fs.unlinkSync(path.join(entriesFolder, entry.fileName));
-
             // Remove entry from entries array
             const entryIndex = entries.findIndex(e => e.fileName === entry.fileName);
             if (entryIndex > -1) {
                 entries.splice(entryIndex, 1);
             }
-
-            console.log(entry.tags);
             // Remove entry from tags
             entry.tags.forEach(tag => {
                 const tagIndex = tags[tag].indexOf(entry.fileName);
@@ -144,11 +254,86 @@ function renderEntries(filterTags = []) {
                 }
             });
 
+            // Delete replies
+            entry.replies.forEach(replyFileName => {
+                fs.unlinkSync(path.join(entriesFolder, replyFileName));
+                // Remove entry from entries array
+                const replyIndex = entries.findIndex(e => e.fileName === replyFileName);
+                if (replyIndex > -1) {
+                    entries.splice(replyIndex, 1);
+                }
+            });
+
             fs.writeFileSync(entriesFile, JSON.stringify(entries));
             fs.writeFileSync(tagsFile, JSON.stringify(tags));
             renderAll();
         };
-        entryElement.appendChild(deleteButton);
+        utilitiesDiv.appendChild(deleteButton);
+
+        parentDiv.appendChild(utilitiesDiv);
+
+        entryElement.appendChild(parentDiv);
+
+        //Display replies
+        entry.replies.forEach(fileName => {
+            const replyElement = document.createElement('div');
+            replyElement.className = 'reply-element';
+
+            const textDiv = document.createElement('div');
+            textDiv.className = 'text-div';
+
+            const textElement = document.createElement('div');
+            const text = fs.readFileSync(path.join(entriesFolder, fileName), 'utf-8');
+            textElement.innerHTML = marked.parse(text);
+            textDiv.appendChild(textElement);
+
+            replyElement.appendChild(textDiv);
+
+            const utilitiesDiv = document.createElement('div');
+            utilitiesDiv.className = 'utilities-div mt-2';
+
+            const replyEntry = entries.find(entry => entry.fileName === fileName);
+            const dateElement = document.createElement('span');
+            dateElement.textContent = `${replyEntry.date}`;
+            dateElement.className = 'date-element';
+            utilitiesDiv.appendChild(dateElement);
+
+            // Edit button
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Edit';
+            editButton.style.height = '32px';
+            editButton.onclick = async () => {
+                editEntry(text, replyEntry);
+            };
+            utilitiesDiv.appendChild(editButton);
+
+            // Delete button
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Delete';
+            deleteButton.style.height = '32px';
+            deleteButton.onclick = () => {
+                // Remove markdown file
+                fs.unlinkSync(path.join(entriesFolder, fileName));
+                // Remove entry from entries array
+                const entryIndex = entries.findIndex(e => e.fileName === fileName);
+                if (entryIndex > -1) {
+                    entries.splice(entryIndex, 1);
+                }
+                entries.forEach(entry => {
+                    const replyIndex = entry.replies.indexOf(fileName);
+                    if (replyIndex > -1) {
+                        entry.replies.splice(replyIndex, 1);
+                    }
+                });
+                fs.writeFileSync(entriesFile, JSON.stringify(entries));
+                renderEntries();
+            };
+            utilitiesDiv.appendChild(deleteButton);
+
+            replyElement.appendChild(utilitiesDiv);
+
+            entryElement.appendChild(replyElement);
+        });
 
         container.appendChild(entryElement);
     });

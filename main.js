@@ -9,14 +9,15 @@ const enableRemoteModule = require('@electron/remote/main');
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    //width: 1000,
+    //height: 750,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
       contextIsolation: false
     }
-  })
+  });
+  mainWindow.maximize();
 
   // and load the index.html of the app.
   mainWindow.loadFile('index.html');
