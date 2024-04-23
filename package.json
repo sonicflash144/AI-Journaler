@@ -1,0 +1,17 @@
+{
+  "name": "pileclone-2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Sage Wang",
+  "license": "ISC",
+  "dependencies": {
+    "@electron/remote": "^2.1.2",
+    "electron-prompt": "^1.7.0",
+    "marked": "^12.0.2"
+  }
+}

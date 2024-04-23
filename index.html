@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pile Clone</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f9fafb;
+            color: #111827;
+        }
+        #entriesContainer ul {
+            list-style-type: disc;
+            padding-left: 20px;
+        }
+        #entriesContainer ol {
+            list-style-type: decimal;
+            padding-left: 20px;
+        }
+        .tag {
+            cursor: pointer;
+            margin-right: 8px;
+        }
+        .tag.selected {
+            background-color: #6ee7b7;
+            color: #065f46;
+        }
+        .entry-tag {
+            display: inline-block;
+            background-color: #cbd5e1;
+            color: #1e293b;
+            padding: 2px 8px;
+            margin: 2px;
+            border-radius: 6px;
+            font-size: 0.875rem; /* Tailwind text-sm */
+        }
+        .entry-tags-container {
+            text-align: right;
+        }
+    </style>
+</head>
+<body class="p-8">
+    <h1 class="text-2xl font-bold mb-4">New Entry</h1>
+    <div class="mb-4">
+        <textarea type="text" id="entryInput" placeholder="Write something..." class="border p-2 w-full"></textarea>
+        <input type="text" id="tagInput" placeholder="Add tags separated by commas" class="border p-2 w-full mt-2">
+        <button onclick="addEntry()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 mt-2">Add Entry</button>
+    </div>
+    <div id="tagsContainer" class="mb-4"></div>
+    <div id="entriesContainer" class="mt-4"></div>
+    <script src="journal.js"></script>
+</body>
+</html>
