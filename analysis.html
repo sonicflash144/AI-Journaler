@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pile Clone</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f9fafb;
+            color: #111827;
+            margin: 20px;
+        }
+        .ch-domain-text{
+            font-size: 16px !important;
+        }
+        .ch-subdomain-text{
+            font-size: 12px !important;
+        }
+    </style>
+</head>
+<body class="p-8">
+    <button onclick="window.location.href='index.html'" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 mt-2 mb-2" style="float: right;">Home</button>
+    <h1 class="text-2xl font-bold mb-4">Calendar Heatmap</h1>
+    <div id="cal-heatmap"></div>
+    <script src="dist/webpack.heatmap.js"></script>
+</body>
+</html>

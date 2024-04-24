@@ -1,6 +1,32 @@
+require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const marked = require('marked');
+const VISION_API_KEY = process.env.VISION_API_KEY;
+
+async function analyzeSentiment(text) {
+    const response = await fetch(`https://language.googleapis.com/v2/documents:analyzeSentiment?key=${VISION_API_KEY}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            document: {
+                type: 'HTML',
+                content: text
+            }
+        })
+    });
+
+    if (response.ok) {
+        const result = await response.json();
+        return result.documentSentiment.score;
+    } else {
+        const error = await response.json();
+        console.error(`Error: ${response.status}, Message: ${error.message}`);
+    }
+}
+
 let entries = [];
 let tags = {};
 
@@ -47,18 +73,19 @@ if (!fs.existsSync(entriesFolder)){
 renderAll();
 
 
-function addReply(parentFileName, replyText) {
+async function addReply(parentFileName, replyText) {
     const entryDate = new Date().toLocaleString();
     const fileName = entryDate.replace(/:/g, '.').replace(/\//g, '-') + '.md';
     const parentFile = entries.find(entry => entry.fileName === parentFileName);
     parentFile.replies.push(fileName);
     fs.writeFileSync(path.join(entriesFolder, fileName), replyText);
-    const newEntry = { fileName, date: entryDate, tags: [], parent: parentFile.fileName, replies: [] };
+    var newEntry = { fileName, date: entryDate, sentimentScore: null, tags: [], parent: parentFile.fileName, replies: [] };
     entries.push(newEntry);
     renderAll();
+    newEntry.sentimentScore = await analyzeSentiment(replyText);
     fs.writeFileSync(entriesFile, JSON.stringify(entries));
 }
-function addEntry() {
+async function addEntry() {
     const entryText = document.getElementById('entryInput').value;
     if (!entryText.trim()) {
         return;
@@ -69,7 +96,7 @@ function addEntry() {
     // Save entry as .md file
     const fileName = entryDate.replace(/:/g, '.').replace(/\//g, '-') + '.md';
     fs.writeFileSync(path.join(entriesFolder, fileName), entryText);
-    const newEntry = { fileName, date: entryDate, tags: [], parent: "", replies: [] };
+    var newEntry = { fileName, date: entryDate, sentimentScore: null, tags: [], parent: "", replies: [] };
     entryTags.forEach(tag => {
         const tagParts = tag.split('/');
         let currentTag = '';
@@ -91,6 +118,7 @@ function addEntry() {
     document.getElementById('tagInput').value = '';
     renderAll();
 
+    newEntry.sentimentScore = await analyzeSentiment(entryText);
     fs.writeFileSync(entriesFile, JSON.stringify(entries));
     fs.writeFileSync(tagsFile, JSON.stringify(tags));
 }
@@ -105,7 +133,7 @@ function editEntry(entryText, entry) {
         modalTagsInput.style.display = 'none';
     }
 
-    saveButton.onclick = function() {
+    saveButton.onclick = async function() {
         const newText = textarea.value;
         if (!newText.trim()) {
             return;
@@ -149,9 +177,10 @@ function editEntry(entryText, entry) {
         }
         
         modal.style.display = "none";
+        renderAll();
+        entry.sentimentScore = await analyzeSentiment(newText);
         fs.writeFileSync(entriesFile, JSON.stringify(entries));
         fs.writeFileSync(tagsFile, JSON.stringify(tags));
-        renderAll();
     };
 }
 
