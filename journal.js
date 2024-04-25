@@ -30,6 +30,14 @@ async function analyzeSentiment(text) {
 let entries = [];
 let tags = {};
 
+const { PythonShell } = require('python-shell');
+let options = {
+  mode: 'text',
+  pythonOptions: ['-u'],
+  scriptPath: __dirname,
+  args: ['']
+};
+
 const container = document.getElementById('entriesContainer');
 const entriesFile = path.join(__dirname, 'user_entries', 'entries.json');
 const tagsFile = path.join(__dirname, 'user_entries', 'tags.json');
@@ -117,10 +125,38 @@ async function addEntry() {
     document.getElementById('entryInput').value = '';
     document.getElementById('tagInput').value = '';
     renderAll();
-
     newEntry.sentimentScore = await analyzeSentiment(entryText);
-    fs.writeFileSync(entriesFile, JSON.stringify(entries));
-    fs.writeFileSync(tagsFile, JSON.stringify(tags));
+    
+    options.args = [entryText];
+    let pyshell = new PythonShell('lda.py', options);
+    pyshell.on('message', function (message) {
+        lda_tags = JSON.parse(message);
+        console.log(lda_tags);
+        if (lda_tags.length === 0) {
+            return;
+        }
+        lda_tags.forEach(tag => {
+            if (!newEntry.tags.includes(tag)) {
+                newEntry.tags.push(tag);
+            }
+            if (!tags[tag]) {
+                tags[tag] = [];
+            }
+            if (!tags[tag].includes(fileName)) {
+                tags[tag].push(fileName);
+            }
+        });
+        const entryIndex = entries.findIndex(entry => entry.fileName === fileName);
+        if (entryIndex !== -1) {
+            entries[entryIndex] = newEntry;
+        }
+        renderAll();
+        fs.writeFileSync(entriesFile, JSON.stringify(entries));
+        fs.writeFileSync(tagsFile, JSON.stringify(tags));
+    });
+    pyshell.on('error', function (err) {
+        console.log('Error:', err.toString());
+    });
 }
 function editEntry(entryText, entry) {
     modal.style.display = "block";
@@ -227,6 +263,13 @@ function renderEntries(filterTags = []) {
 
         const utilitiesDiv = document.createElement('div');
         utilitiesDiv.className = 'utilities-div mt-2';
+
+        //Reply button
+        const replyButton = document.createElement('button');
+        replyButton.textContent = 'Reply';
+        replyButton.className = 'reply-button';
+        replyButton.onclick = () => toggleReplyInput(index);
+        utilitiesDiv.appendChild(replyButton);
         
         const tagsElement = document.createElement('div');
         tagsElement.className = 'entry-tags-container';
@@ -242,18 +285,11 @@ function renderEntries(filterTags = []) {
         dateElement.textContent = `${entry.date}`;
         dateElement.className = 'date-element';
         utilitiesDiv.appendChild(dateElement);
-        
-        //Reply button
-        const replyButton = document.createElement('button');
-        replyButton.textContent = 'Reply';
-        replyButton.className = 'reply-button';
-        replyButton.onclick = () => toggleReplyInput(index);
-        utilitiesDiv.appendChild(replyButton);
 
         // Edit button
         const editButton = document.createElement('button');
         editButton.textContent = 'Edit';
-        editButton.style.height = '32px';
+        editButton.className = 'edit-button';
         editButton.onclick = async () => {
             editEntry(entryText, entry);
         };
@@ -262,7 +298,7 @@ function renderEntries(filterTags = []) {
         // Delete button
         const deleteButton = document.createElement('button');
         deleteButton.textContent = 'Delete';
-        deleteButton.style.height = '32px';
+        deleteButton.className = 'delete-button';
         deleteButton.onclick = () => {
             // Remove markdown file
             fs.unlinkSync(path.join(entriesFolder, entry.fileName));
@@ -330,7 +366,7 @@ function renderEntries(filterTags = []) {
             // Edit button
             const editButton = document.createElement('button');
             editButton.textContent = 'Edit';
-            editButton.style.height = '32px';
+            editButton.className = 'edit-button';
             editButton.onclick = async () => {
                 editEntry(text, replyEntry);
             };
@@ -339,7 +375,7 @@ function renderEntries(filterTags = []) {
             // Delete button
             const deleteButton = document.createElement('button');
             deleteButton.textContent = 'Delete';
-            deleteButton.style.height = '32px';
+            deleteButton.className = 'delete-button';
             deleteButton.onclick = () => {
                 // Remove markdown file
                 fs.unlinkSync(path.join(entriesFolder, fileName));
@@ -393,3 +429,4 @@ function renderAll(){
     renderEntries();
     renderTags();
 }
+

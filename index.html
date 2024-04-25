@@ -21,17 +21,17 @@
             margin-bottom: 0.5rem;
         }
         .text-div {
-            width: 70%;
+            width: 60%;
             margin-top: 0.5rem;
             display: flex;
             flex-direction: column;
         }
         .utilities-div {
-            width: 25%;
+            width: 35%;
             margin-top: 0.5rem;
             display: flex;
             flex-direction: row;
-            justify-content: space-between;
+            justify-content: flex-end;
         }
         #entriesContainer ul {
             list-style-type: disc;
@@ -56,10 +56,12 @@
             padding: 2px 8px;
             margin: 2px;
             border-radius: 6px;
-            font-size: 0.875rem; /* Tailwind text-sm */
+            font-size: 0.875rem;
         }
         .entry-tags-container {
             text-align: right;
+            width: 200px;
+            margin-right: 2rem;
         }
         .modal {
             display: none; 
@@ -82,6 +84,7 @@
         .date-element {
             font-size: 0.75rem;
             color: #6b7280;
+            margin-right: 2rem;
         }
         .reply-input {
             display: none;
@@ -97,14 +100,15 @@
         }
         .reply-button {
             height: 32px;
-            background-color: #e5e7eb; 
-            color: #1e293b;
+            background-color: #b96be0; 
+            color: #fefefe;
             padding: 2px 8px;
             border-radius: 6px; 
             transition: background-color 0s; 
+            margin-right: 2rem;
         }
             .reply-button:hover {
-                background-color: #d2d5da; /* hover:bg-gray-300 */
+                background-color: #9932CC; 
             }
         .reply-element {
             margin-top: 0.5rem; 
@@ -112,6 +116,13 @@
             padding-top: 0.5rem;
             display: flex;
             justify-content: space-between;
+        }
+        .edit-button {
+            height: 32px;
+            margin-right: 2rem;
+        }
+        .delete-button{
+            height: 32px;
         }
     </style>
 </head>

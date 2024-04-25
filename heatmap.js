@@ -1,8 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const marked = require('marked');
 import CalHeatmap from 'cal-heatmap';
 import 'cal-heatmap/cal-heatmap.css';
 
+const container = document.getElementById('entriesContainer');
 const calHeatmapDiv = document.getElementById('cal-heatmap');
 const entriesFile = path.join(__dirname, 'user_entries', 'entries.json');
 const entriesFolder = path.join(__dirname, 'user_entries');
@@ -77,5 +79,99 @@ function createHeatmap(data){
 
     calHeatmapDiv.appendChild(prevButton);
     calHeatmapDiv.appendChild(nextButton);
+
+    cal.on('click', (event, timestamp, value) => {
+        // Convert the timestamp to a date object
+        const clickedDate = new Date(timestamp);
+        clickedDate.setDate(clickedDate.getDate() + 1);
+    
+        // Filter the entries based on the clicked date
+        const clickedEntries = entries.filter(entry => {
+            const entryDate = new Date(entry.date);
+            return entryDate.getFullYear() === clickedDate.getFullYear() &&
+                entryDate.getMonth() === clickedDate.getMonth() &&
+                entryDate.getDate() === clickedDate.getDate();
+        });
+    
+        // Call the renderEntries function with the clicked entries
+        renderEntries(clickedEntries);
+    });
 }
 createHeatmap(data);
+
+function renderEntries(entries) {
+    container.innerHTML = '';
+    entries.filter(entry => entry.parent === "")
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .forEach(entry => {
+        const entryText = fs.readFileSync(path.join(entriesFolder, entry.fileName), 'utf-8');
+
+        const entryElement = document.createElement('div');
+        entryElement.className = 'entry-element p-4 border mb-2';
+
+        const parentDiv = document.createElement('div');
+        parentDiv.className = 'parent-div';
+
+        const textDiv = document.createElement('div');
+        textDiv.className = 'text-div';
+
+        const textElement = document.createElement('div');
+        textElement.innerHTML = marked.parse(entryText);
+        textDiv.appendChild(textElement);
+
+        parentDiv.appendChild(textDiv);
+
+        const utilitiesDiv = document.createElement('div');
+        utilitiesDiv.className = 'utilities-div mt-2';
+        
+        const tagsElement = document.createElement('div');
+        tagsElement.className = 'entry-tags-container';
+        entry.tags.forEach(tag => {
+            const tagElement = document.createElement('span');
+            tagElement.className = 'entry-tag';
+            tagElement.textContent = tag;
+            tagsElement.appendChild(tagElement);
+        });
+        utilitiesDiv.appendChild(tagsElement);
+        
+        const dateElement = document.createElement('span');
+        dateElement.textContent = `${entry.date}`;
+        dateElement.className = 'date-element';
+        utilitiesDiv.appendChild(dateElement);
+
+        parentDiv.appendChild(utilitiesDiv);
+
+        entryElement.appendChild(parentDiv);
+
+        //Display replies
+        entry.replies.forEach(fileName => {
+            const replyElement = document.createElement('div');
+            replyElement.className = 'reply-element';
+
+            const textDiv = document.createElement('div');
+            textDiv.className = 'text-div';
+
+            const textElement = document.createElement('div');
+            const text = fs.readFileSync(path.join(entriesFolder, fileName), 'utf-8');
+            textElement.innerHTML = marked.parse(text);
+            textDiv.appendChild(textElement);
+
+            replyElement.appendChild(textDiv);
+
+            const utilitiesDiv = document.createElement('div');
+            utilitiesDiv.className = 'utilities-div mt-2';
+
+            const replyEntry = entries.find(entry => entry.fileName === fileName);
+            const dateElement = document.createElement('span');
+            dateElement.textContent = `${replyEntry.date}`;
+            dateElement.className = 'date-element';
+            utilitiesDiv.appendChild(dateElement);
+
+            replyElement.appendChild(utilitiesDiv);
+
+            entryElement.appendChild(replyElement);
+        });
+
+        container.appendChild(entryElement);
+    });
+}
