@@ -1,4 +1,6 @@
 node_modules/
 user_entries/
 dist/
+lib/
 .env
+chatHistory.json

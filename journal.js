@@ -26,10 +26,6 @@ async function analyzeSentiment(text) {
         console.error(`Error: ${response.status}, Message: ${error.message}`);
     }
 }
-
-let entries = [];
-let tags = {};
-
 const { PythonShell } = require('python-shell');
 let options = {
   mode: 'text',
@@ -63,6 +59,8 @@ function toggleReplyInput(index) {
     addReplyButtons[index].style.display = addReplyButtons[index].style.display === 'block' ? 'none' : 'block';
 }
 
+let entries = [];
+let tags = {};
 // Load local entries and tags
 if (fs.existsSync(entriesFile)) {
     const data = JSON.parse(fs.readFileSync(entriesFile, 'utf-8'));
@@ -429,4 +427,3 @@ function renderAll(){
     renderEntries();
     renderTags();
 }
-
