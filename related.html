@@ -139,26 +139,9 @@
     </style>
 </head>
 <body class="p-8">
-    <div class="flex justify-end space-x-2">
-        <button onclick="window.location.href='analysis.html'" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 mt-2 mb-2">Analysis</button>
-        <button onclick="window.location.href='chat.html'" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 mt-2 mb-2">Chat</button>
-    </div>
+    <button onclick="window.location.href='index.html'" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 mt-2 mb-2 ml-2" style="float: right;">Home</button>
 
-    <h1 class="text-2xl font-bold mb-4">New Entry</h1>
-    <div class="mb-4">
-        <textarea type="text" id="entryInput" placeholder="Write something..." class="border p-2 w-full"></textarea>
-        <input type="text" id="tagInput" placeholder="Add tags separated by commas" class="border p-2 w-full mt-2">
-        <button onclick="addEntry()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 mt-2">Add Entry</button>
-    </div>
-    <div id="myModal" class="modal">
-        <div class="modal-content">
-            <textarea id="modalTextarea" class="border p-2 w-full"></textarea>
-            <input id="modalTagsInput" type="text" class="border p-2 w-full mt-2" placeholder="Enter tags, separated by commas">
-            <button id="saveButton" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 mt-2">Save</button>
-        </div>
-    </div>
-    <div id="tagsContainer" class="mb-4"></div>
-    <div id="entriesContainer" class="mt-4"></div>
-    <script src="journal.js"></script>
+    <div id="entriesContainer" class="mt-4" style="width: 80%;"></div>
+    <script src="related.js"></script>
 </body>
 </html>

@@ -3,4 +3,3 @@ user_entries/
 dist/
 lib/
 .env
-chatHistory.json

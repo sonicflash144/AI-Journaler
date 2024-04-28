@@ -11,6 +11,7 @@ Settings.llm = new OpenAI({ model: "gpt-3.5-turbo", apiKey: process.env.OPENAI_A
 Settings.embedModel = new OpenAIEmbedding();
 Settings.chunkSize = 512;
 var chatEngine;
+var retriever;
 
 const createWindow = () => {
   // Create the browser window.
@@ -69,13 +70,13 @@ async function initializeChatEngine() {
 
   // Split text and create embeddings. Store them in a VectorStoreIndex
   const index = await VectorStoreIndex.fromDocuments(documents);
-  const retriever = index.asRetriever();
+  retriever = index.asRetriever();
   retriever.similarityTopK = 5;
   chatEngine = new ContextChatEngine({ 
       retriever, 
       contextSystemPrompt: customContextSystemPrompt
   });
-  console.log("Chat engine initialized");
+  console.log("Initialized!");
 }
 
 ipcMain.handle('sendMessage', async (event, query) => {
@@ -85,6 +86,15 @@ ipcMain.handle('sendMessage', async (event, query) => {
         response += chunk.response;
     }
     return response;
+});
+
+ipcMain.handle('getRelatedEntries', async (event, query) => {
+  await initializeChatEngine();
+  const sourceNodes = await retriever.retrieve({ query: query });
+  return sourceNodes.map(node => ({
+      score: node.score,
+      fileName: node.node.relationships['SOURCE'].nodeId
+  }));
 });
 
 function customContextSystemPrompt({ context = '' }) {

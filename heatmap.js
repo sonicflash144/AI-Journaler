@@ -94,12 +94,12 @@ function createHeatmap(data){
         });
     
         // Call the renderEntries function with the clicked entries
-        renderEntries(clickedEntries);
+        renderEntries(clickedEntries, clickedDate);
     });
 }
 createHeatmap(data);
 
-function renderEntries(entries) {
+function renderEntries(entries, clickedDate) {
     container.innerHTML = '';
     entries.filter(entry => entry.parent === "")
     .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -145,6 +145,12 @@ function renderEntries(entries) {
 
         //Display replies
         entry.replies.forEach(fileName => {
+            const dateString = fileName.split(',')[0];
+            const replyDate = new Date(dateString);
+            if (replyDate.getDate() !== clickedDate.getDate() || replyDate.getMonth() !== clickedDate.getMonth() || replyDate.getFullYear() !== clickedDate.getFullYear()) {
+                return;
+            }
+
             const replyElement = document.createElement('div');
             replyElement.className = 'reply-element';
 

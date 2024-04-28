@@ -268,6 +268,16 @@ function renderEntries(filterTags = []) {
         replyButton.className = 'reply-button';
         replyButton.onclick = () => toggleReplyInput(index);
         utilitiesDiv.appendChild(replyButton);
+
+        const relatedButton = document.createElement('button');
+        relatedButton.textContent = 'Related';
+        relatedButton.className = 'related-button';
+        relatedButton.onclick = () => {
+            const query = { fileName: entry.fileName, text: entryText };
+            fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
+            window.location.href = 'related.html';
+        };
+        utilitiesDiv.appendChild(relatedButton);
         
         const tagsElement = document.createElement('div');
         tagsElement.className = 'entry-tags-container';
@@ -354,6 +364,16 @@ function renderEntries(filterTags = []) {
 
             const utilitiesDiv = document.createElement('div');
             utilitiesDiv.className = 'utilities-div mt-2';
+
+            const relatedButton = document.createElement('button');
+            relatedButton.textContent = 'Related';
+            relatedButton.className = 'related-button';
+            relatedButton.onclick = () => {
+                const query = { fileName: fileName, content: text };
+                fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
+                window.location.href = 'related.html';
+            };
+            utilitiesDiv.appendChild(relatedButton);
 
             const replyEntry = entries.find(entry => entry.fileName === fileName);
             const dateElement = document.createElement('span');
