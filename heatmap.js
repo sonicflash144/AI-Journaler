@@ -3,12 +3,26 @@ const path = require('path');
 const marked = require('marked');
 import CalHeatmap from 'cal-heatmap';
 import 'cal-heatmap/cal-heatmap.css';
+const angleUpIcon = document.createElement('i');
+angleUpIcon.className = 'fas fa-angle-up';
+const angleDownIcon = document.createElement('i');
+angleDownIcon.className = 'fas fa-angle-down';
 
 const container = document.getElementById('entriesContainer');
 const calHeatmapDiv = document.getElementById('cal-heatmap');
 const entriesFile = path.join(__dirname, 'user_entries', 'entries.json');
 const entriesFolder = path.join(__dirname, 'user_entries');
 let entries = [];
+let clickedDate;
+
+const contextBtn = document.getElementById('toggleContextButton');
+let showContext = false;
+contextBtn.onclick = function() {
+    container.classList.toggle('show-context');
+    showContext = container.classList.contains('show-context');
+    contextBtn.textContent = showContext ? 'Hide Context' : 'Show Context';
+    filterEntries(clickedDate);
+}
 
 if (fs.existsSync(entriesFile)) {
     const data = JSON.parse(fs.readFileSync(entriesFile, 'utf-8'));
@@ -36,7 +50,11 @@ data = Object.entries(data).map(([date, values]) => {
 
 function createHeatmap(data){
     const monthsPerPage = 3;
+
     window.cal = new CalHeatmap();
+    const currentDate = new Date();
+    const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 1);
+
     window.cal.paint(
     {
         data: {
@@ -47,7 +65,7 @@ function createHeatmap(data){
         verticalOrientation: true,
         range: monthsPerPage,
         itemSelector: '#cal-heatmap',
-        date: { start: new Date('2024-02-01') },
+        date: { start: startDate },
         scale: { color: { type: 'diverging', scheme: 'PRGn', domain: [-1, 1] } },
         domain: {
             type: 'month',
@@ -82,102 +100,210 @@ function createHeatmap(data){
 
     cal.on('click', (event, timestamp, value) => {
         // Convert the timestamp to a date object
-        const clickedDate = new Date(timestamp);
+        clickedDate = new Date(timestamp);
         clickedDate.setDate(clickedDate.getDate() + 1);
     
-        // Filter the entries based on the clicked date
-        const clickedEntries = entries.filter(entry => {
-            const entryDate = new Date(entry.date);
-            return entryDate.getFullYear() === clickedDate.getFullYear() &&
-                entryDate.getMonth() === clickedDate.getMonth() &&
-                entryDate.getDate() === clickedDate.getDate();
-        });
-    
-        // Call the renderEntries function with the clicked entries
-        renderEntries(clickedEntries, clickedDate);
+        filterEntries(clickedDate);
     });
 }
 createHeatmap(data);
 
-function renderEntries(entries, clickedDate) {
+function filterEntries(clickedDate) {
     container.innerHTML = '';
-    entries.filter(entry => entry.parent === "")
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .forEach(entry => {
-        const entryText = fs.readFileSync(path.join(entriesFolder, entry.fileName), 'utf-8');
+    const entriesForDate = entries.filter(entry => {
+        const entryDate = new Date(entry.date);
+        return entryDate.getDate() === clickedDate.getDate() &&
+            entryDate.getMonth() === clickedDate.getMonth() &&
+            entryDate.getFullYear() === clickedDate.getFullYear();
+    });
+    if (showContext) {
+        const renderedEntries = new Set();
+        entriesForDate.forEach(entry => {
+            if (entry.parent === "") {
+                renderEntry(entry);
+                renderedEntries.add(entry.fileName);
+            } else {
+                // Find the parent entry
+                const parentEntry = entries.find(e => e.fileName === entry.parent);
+                if (parentEntry && !renderedEntries.has(parentEntry.fileName)) {
+                    renderEntry(parentEntry);
+                    renderedEntries.add(parentEntry.fileName);
+                }
+            }
+        });
+    } else {
+        entriesForDate.forEach(entry => {
+            renderEntry(entry);
+        });
+    }
+}
 
-        const entryElement = document.createElement('div');
-        entryElement.className = 'entry-element p-4 border mb-2';
+function renderEntry(entry, showReplies=showContext) {
+    const entryText = fs.readFileSync(path.join(entriesFolder, entry.fileName), 'utf-8');
 
-        const parentDiv = document.createElement('div');
-        parentDiv.className = 'parent-div';
+    const entryElement = document.createElement('div');
+    entryElement.className = 'entry-element p-4 border mb-2';
+
+    const parentDiv = document.createElement('div');
+    parentDiv.className = 'parent-div';
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'text-div';
+
+    const textElement = document.createElement('div');
+    textElement.innerHTML = marked.parse(entryText);
+    textElement.classList.add('truncate');
+
+    //See more
+    const seeMoreLink = document.createElement('a');
+    seeMoreLink.textContent = 'See more';
+    seeMoreLink.href = '#';
+    seeMoreLink.style.display = 'none';
+    seeMoreLink.style.color = 'gray';
+    seeMoreLink.onclick = (e) => {
+        e.preventDefault();
+        if (textElement.classList.contains('truncate')) {
+            textElement.classList.remove('truncate');
+            seeMoreLink.textContent = 'See less';
+        } else {
+            textElement.classList.add('truncate');
+            seeMoreLink.textContent = 'See more';
+        }
+    };
+    textDiv.appendChild(textElement);
+    textDiv.appendChild(seeMoreLink);
+    setTimeout(() => {
+        const lineHeight = parseFloat(window.getComputedStyle(textElement).lineHeight);
+        if (textElement.scrollHeight <= lineHeight * 3) {
+            seeMoreLink.style.display = 'none';
+            textElement.classList.remove('truncate');
+        } else {
+            seeMoreLink.style.display = 'block';
+        }
+    }, 0);
+
+    parentDiv.appendChild(textDiv);
+
+    const utilitiesDiv = document.createElement('div');
+    utilitiesDiv.className = 'utilities-div mt-2';
+
+    const relatedButton = document.createElement('button');
+    relatedButton.textContent = 'Related';
+    relatedButton.className = 'related-button';
+    relatedButton.onclick = () => {
+        const query = { fileName: entry.fileName, text: entryText };
+        fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
+        window.location.href = 'related.html';
+    };
+    utilitiesDiv.appendChild(relatedButton);
+
+    const tagsElement = document.createElement('div');
+    tagsElement.className = 'entry-tags-container';
+    entry.tags.forEach(tag => {
+        const tagElement = document.createElement('span');
+        tagElement.className = 'entry-tag';
+        tagElement.textContent = tag;
+        tagsElement.appendChild(tagElement);
+    });
+    utilitiesDiv.appendChild(tagsElement);
+
+    const dateElement = document.createElement('span');
+    dateElement.textContent = `${entry.date}`;
+    dateElement.className = 'date-element';
+    utilitiesDiv.appendChild(dateElement);
+    parentDiv.appendChild(utilitiesDiv);
+    entryElement.appendChild(parentDiv);
+
+    if(!showReplies){
+        container.appendChild(entryElement);
+        return;
+    }
+
+    // Display replies
+    if (entry.replies.length > 0) {
+        const toggleRepliesButton = document.createElement('button');
+        toggleRepliesButton.innerHTML = '';
+        toggleRepliesButton.appendChild(angleUpIcon.cloneNode(true)); 
+        toggleRepliesButton.onclick = () => {
+            const replyElements = entryElement.querySelectorAll('.reply-element');
+            replyElements.forEach(replyElement => {
+                if (replyElement.classList.contains('hide')) {
+                    replyElement.classList.remove('hide');
+                    toggleRepliesButton.innerHTML = '';
+                    toggleRepliesButton.appendChild(angleDownIcon.cloneNode(true));
+
+                    // Calculate scrollHeight when the reply is visible
+                    const textElement = replyElement.querySelector('.text-div div');
+                    const seeMoreLink = replyElement.querySelector('.text-div a');
+                    const lineHeight = parseFloat(window.getComputedStyle(textElement).lineHeight);
+                    if (textElement.scrollHeight > lineHeight * 3) {
+                        seeMoreLink.style.display = 'block';
+                        textElement.classList.add('truncate');
+                    }
+                } else {
+                    replyElement.classList.add('hide');
+                    toggleRepliesButton.innerHTML = '';
+                    toggleRepliesButton.appendChild(angleUpIcon.cloneNode(true));
+                }
+            });
+        };
+        parentDiv.insertBefore(toggleRepliesButton, parentDiv.firstChild);
+    }
+    entryElement.appendChild(parentDiv);
+
+    entry.replies.forEach(fileName => {
+        const replyElement = document.createElement('div');
+        replyElement.className = 'reply-element hide';
 
         const textDiv = document.createElement('div');
         textDiv.className = 'text-div';
 
         const textElement = document.createElement('div');
-        textElement.innerHTML = marked.parse(entryText);
-        textDiv.appendChild(textElement);
+        const text = fs.readFileSync(path.join(entriesFolder, fileName), 'utf-8');
+        textElement.innerHTML = marked.parse(text);
 
-        parentDiv.appendChild(textDiv);
+        // See more
+        const seeMoreLink = document.createElement('a');
+        seeMoreLink.textContent = 'See more';
+        seeMoreLink.href = '#';
+        seeMoreLink.style.display = 'none';
+        seeMoreLink.style.color = 'gray';
+        seeMoreLink.onclick = (e) => {
+            e.preventDefault();
+            if (textElement.classList.contains('truncate')) {
+                textElement.classList.remove('truncate');
+                seeMoreLink.textContent = 'See less';
+            } else {
+                textElement.classList.add('truncate');
+                seeMoreLink.textContent = 'See more';
+            }
+        };
+        textDiv.appendChild(textElement);
+        textDiv.appendChild(seeMoreLink);
+        replyElement.appendChild(textDiv);
 
         const utilitiesDiv = document.createElement('div');
         utilitiesDiv.className = 'utilities-div mt-2';
-        
-        const tagsElement = document.createElement('div');
-        tagsElement.className = 'entry-tags-container';
-        entry.tags.forEach(tag => {
-            const tagElement = document.createElement('span');
-            tagElement.className = 'entry-tag';
-            tagElement.textContent = tag;
-            tagsElement.appendChild(tagElement);
-        });
-        utilitiesDiv.appendChild(tagsElement);
-        
+
+        const relatedButton = document.createElement('button');
+        relatedButton.textContent = 'Related';
+        relatedButton.className = 'related-button';
+        relatedButton.onclick = () => {
+            const query = { fileName: fileName, text: text };
+            fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
+            window.location.href = 'related.html';
+        };
+        utilitiesDiv.appendChild(relatedButton);
+
+        const replyEntry = entries.find(entry => entry.fileName === fileName);
         const dateElement = document.createElement('span');
-        dateElement.textContent = `${entry.date}`;
+        dateElement.textContent = `${replyEntry.date}`;
         dateElement.className = 'date-element';
         utilitiesDiv.appendChild(dateElement);
+        replyElement.appendChild(utilitiesDiv);
 
-        parentDiv.appendChild(utilitiesDiv);
-
-        entryElement.appendChild(parentDiv);
-
-        //Display replies
-        entry.replies.forEach(fileName => {
-            const dateString = fileName.split(',')[0];
-            const replyDate = new Date(dateString);
-            if (replyDate.getDate() !== clickedDate.getDate() || replyDate.getMonth() !== clickedDate.getMonth() || replyDate.getFullYear() !== clickedDate.getFullYear()) {
-                return;
-            }
-
-            const replyElement = document.createElement('div');
-            replyElement.className = 'reply-element';
-
-            const textDiv = document.createElement('div');
-            textDiv.className = 'text-div';
-
-            const textElement = document.createElement('div');
-            const text = fs.readFileSync(path.join(entriesFolder, fileName), 'utf-8');
-            textElement.innerHTML = marked.parse(text);
-            textDiv.appendChild(textElement);
-
-            replyElement.appendChild(textDiv);
-
-            const utilitiesDiv = document.createElement('div');
-            utilitiesDiv.className = 'utilities-div mt-2';
-
-            const replyEntry = entries.find(entry => entry.fileName === fileName);
-            const dateElement = document.createElement('span');
-            dateElement.textContent = `${replyEntry.date}`;
-            dateElement.className = 'date-element';
-            utilitiesDiv.appendChild(dateElement);
-
-            replyElement.appendChild(utilitiesDiv);
-
-            entryElement.appendChild(replyElement);
-        });
-
-        container.appendChild(entryElement);
+        entryElement.appendChild(replyElement);
     });
+
+    container.appendChild(entryElement);
 }

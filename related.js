@@ -22,7 +22,8 @@ if (!fs.existsSync(entriesFolder)){
 (async () => {
     const queryFile = path.join(__dirname, 'query.json');
     const query = JSON.parse(fs.readFileSync(queryFile, 'utf-8'));
-    const sourceNodes = await ipcRenderer.invoke('getRelatedEntries', query.text);
+    let sourceNodes = await ipcRenderer.invoke('getRelatedEntries', query.text);
+    sourceNodes = sourceNodes.filter(node => node.score >= 0.75);
     const relatedEntries = sourceNodes.map(node => 
         entries.find(entry => entry.fileName === node.fileName)
     ).filter(entry => entry !== undefined);
@@ -31,8 +32,7 @@ if (!fs.existsSync(entriesFolder)){
 
 function renderEntries(entries) {
     container.innerHTML = '';
-    entries.filter(entry => entry.parent === "")
-    .forEach(entry => {
+    entries.forEach(entry => {
         const entryText = fs.readFileSync(path.join(entriesFolder, entry.fileName), 'utf-8');
 
         const entryElement = document.createElement('div');
@@ -52,6 +52,18 @@ function renderEntries(entries) {
 
         const utilitiesDiv = document.createElement('div');
         utilitiesDiv.className = 'utilities-div mt-2';
+
+        if(!isOriginal){
+            const relatedButton = document.createElement('button');
+            relatedButton.textContent = 'Related';
+            relatedButton.className = 'related-button';
+            relatedButton.onclick = () => {
+                const query = { fileName: entry.fileName, text: entryText };
+                fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
+                window.location.href = 'related.html';
+            };
+            utilitiesDiv.appendChild(relatedButton);
+        }
         
         const tagsElement = document.createElement('div');
         tagsElement.className = 'entry-tags-container';

@@ -26,18 +26,19 @@ async function analyzeSentiment(text) {
         console.error(`Error: ${response.status}, Message: ${error.message}`);
     }
 }
-const { PythonShell } = require('python-shell');
-let options = {
-  mode: 'text',
-  pythonOptions: ['-u'],
-  scriptPath: __dirname,
-  args: ['']
-};
+
+const angleUpIcon = document.createElement('i');
+angleUpIcon.className = 'fas fa-angle-up';
+const angleDownIcon = document.createElement('i');
+angleDownIcon.className = 'fas fa-angle-down';
 
 const container = document.getElementById('entriesContainer');
 const entriesFile = path.join(__dirname, 'user_entries', 'entries.json');
 const tagsFile = path.join(__dirname, 'user_entries', 'tags.json');
 const entriesFolder = path.join(__dirname, 'user_entries');
+const searchBar = document.getElementById('searchBar');
+var currentQuery = "";
+var currentTags = [];
 var modal = document.getElementById("myModal");
 var textarea = document.getElementById("modalTextarea");
 var modalTagsInput = document.getElementById('modalTagsInput');
@@ -78,7 +79,6 @@ if (!fs.existsSync(entriesFolder)){
 }
 renderAll();
 
-
 async function addReply(parentFileName, replyText) {
     const entryDate = new Date().toLocaleString();
     const fileName = entryDate.replace(/:/g, '.').replace(/\//g, '-') + '.md';
@@ -90,6 +90,7 @@ async function addReply(parentFileName, replyText) {
     renderAll();
     newEntry.sentimentScore = await analyzeSentiment(replyText);
     fs.writeFileSync(entriesFile, JSON.stringify(entries));
+    console.log(fileName + " added");
 }
 async function addEntry() {
     const entryText = document.getElementById('entryInput').value;
@@ -124,37 +125,13 @@ async function addEntry() {
     document.getElementById('tagInput').value = '';
     renderAll();
     newEntry.sentimentScore = await analyzeSentiment(entryText);
-    
-    options.args = [entryText];
-    let pyshell = new PythonShell('lda.py', options);
-    pyshell.on('message', function (message) {
-        lda_tags = JSON.parse(message);
-        console.log(lda_tags);
-        if (lda_tags.length === 0) {
-            return;
-        }
-        lda_tags.forEach(tag => {
-            if (!newEntry.tags.includes(tag)) {
-                newEntry.tags.push(tag);
-            }
-            if (!tags[tag]) {
-                tags[tag] = [];
-            }
-            if (!tags[tag].includes(fileName)) {
-                tags[tag].push(fileName);
-            }
-        });
-        const entryIndex = entries.findIndex(entry => entry.fileName === fileName);
-        if (entryIndex !== -1) {
-            entries[entryIndex] = newEntry;
-        }
-        renderAll();
-        fs.writeFileSync(entriesFile, JSON.stringify(entries));
-        fs.writeFileSync(tagsFile, JSON.stringify(tags));
-    });
-    pyshell.on('error', function (err) {
-        console.log('Error:', err.toString());
-    });
+    const entryIndex = entries.findIndex(entry => entry.fileName === fileName);
+    if (entryIndex !== -1) {
+        entries[entryIndex] = newEntry;
+    }
+    fs.writeFileSync(entriesFile, JSON.stringify(entries));
+    fs.writeFileSync(tagsFile, JSON.stringify(tags));
+    console.log(fileName + " added");
 }
 function editEntry(entryText, entry) {
     modal.style.display = "block";
@@ -218,79 +195,293 @@ function editEntry(entryText, entry) {
     };
 }
 
-function renderEntries(filterTags = []) {
+searchBar.addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+        currentQuery = this.value;
+        searchEntries(currentQuery, currentTags);
+    }
+});
+function searchEntries(query, tags) {
+    if(query === ""){
+        renderEntries(tags);
+        return;
+    }
+    const lowerCaseQuery = query.toLowerCase();
+    const matchingEntries = entries.filter(entry => {
+        const entryText = fs.readFileSync(path.join(entriesFolder, entry.fileName), 'utf-8').toLowerCase();
+        return entryText.includes(lowerCaseQuery);
+    });
+    renderEntries(tags, matchingEntries);
+}
+function renderEntries(filterTags=[], filteredEntries=[-1]) {
     container.innerHTML = '';
-    entries.filter(entry => entry.parent === "" && (filterTags.length === 0 || filterTags.every(tag => entry.tags.includes(tag))))    
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .forEach((entry, index) => {
-        const entryText = fs.readFileSync(path.join(entriesFolder, entry.fileName), 'utf-8');
+    if(filteredEntries[0] === -1){
+        entries.filter(entry => entry.parent === "" && (filterTags.length === 0 || filterTags.every(tag => entry.tags.includes(tag))))    
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .forEach((entry, index) => {
+            renderEntry(entry, index);
+        });
+    }
+    else{
+        const renderedEntries = new Set();
+        filteredEntries.filter(entry => filterTags.length === 0 || filterTags.every(tag => entry.tags.includes(tag)))
+        .forEach((entry, index) => {
+            if(entry.parent === ""){
+                if (!renderedEntries.has(entry.fileName)) {
+                    renderEntry(entry, index);
+                    renderedEntries.add(entry.fileName);
+                }
+            }
+            else{
+                const parentEntry = entries.find(e => e.fileName === entry.parent);
+                if (parentEntry && !renderedEntries.has(parentEntry.fileName)) {
+                    renderEntry(parentEntry, entries.indexOf(parentEntry), true);
+                    renderedEntries.add(parentEntry.fileName);
+                }
+            }
+        });
+    }
+    
+}
+function renderEntry(entry, index, showReplies=false){
+    const entryText = fs.readFileSync(path.join(entriesFolder, entry.fileName), 'utf-8');
 
-        const entryElement = document.createElement('div');
-        entryElement.className = 'entry-element p-4 border mb-2';
+    const entryElement = document.createElement('div');
+    entryElement.className = 'entry-element p-4 border mb-2';
 
-        const parentDiv = document.createElement('div');
-        parentDiv.className = 'parent-div';
+    const parentDiv = document.createElement('div');
+    parentDiv.className = 'parent-div';
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'text-div';
+
+    const textElement = document.createElement('div');
+    textElement.innerHTML = marked.parse(entryText);
+    textElement.classList.add('truncate');
+
+    //See more
+    const seeMoreLink = document.createElement('a');
+    seeMoreLink.textContent = 'See more';
+    seeMoreLink.href = '#';
+    seeMoreLink.style.display = 'none';
+    seeMoreLink.style.color = 'gray';
+    seeMoreLink.onclick = (e) => {
+        e.preventDefault();
+        if (textElement.classList.contains('truncate')) {
+            textElement.classList.remove('truncate');
+            seeMoreLink.textContent = 'See less';
+        } else {
+            textElement.classList.add('truncate');
+            seeMoreLink.textContent = 'See more';
+        }
+    };
+    textDiv.appendChild(textElement);
+    textDiv.appendChild(seeMoreLink);
+    setTimeout(() => {
+        const lineHeight = parseFloat(window.getComputedStyle(textElement).lineHeight);
+        if (textElement.scrollHeight <= lineHeight * 3) {
+            seeMoreLink.style.display = 'none';
+            textElement.classList.remove('truncate');
+        } else {
+            seeMoreLink.style.display = 'block';
+        }
+    }, 0);
+
+    //Reply input
+    const replyInput = document.createElement('textarea');
+    replyInput.rows = 3;
+    replyInput.type = 'text';
+    replyInput.placeholder = 'Write a reply...';
+    replyInput.className = 'mt-2 reply-input border';
+    textDiv.appendChild(replyInput);
+
+    const addReplyButton = document.createElement('button');
+    addReplyButton.textContent = 'Add Reply';
+    addReplyButton.className = 'add-reply bg-blue-500 hover:bg-blue-700 text-white mt-2';
+    addReplyButton.onclick = () => {
+        if(!replyInput.value.trim()){
+            return;
+        }
+        addReply(entry.fileName, replyInput.value);
+        replyInput.value = '';
+    };
+    textDiv.appendChild(addReplyButton);
+
+    parentDiv.appendChild(textDiv);
+
+    const utilitiesDiv = document.createElement('div');
+    utilitiesDiv.className = 'utilities-div mt-2';
+
+    //Reply button
+    const replyButton = document.createElement('button');
+    replyButton.textContent = 'Reply';
+    replyButton.className = 'reply-button';
+    replyButton.onclick = () => toggleReplyInput(index);
+    utilitiesDiv.appendChild(replyButton);
+
+    const relatedButton = document.createElement('button');
+    relatedButton.textContent = 'Related';
+    relatedButton.className = 'related-button';
+    relatedButton.onclick = () => {
+        const query = { fileName: entry.fileName, text: entryText };
+        fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
+        window.location.href = 'related.html';
+    };
+    utilitiesDiv.appendChild(relatedButton);
+    
+    const tagsElement = document.createElement('div');
+    tagsElement.className = 'entry-tags-container';
+    entry.tags.forEach(tag => {
+        const tagElement = document.createElement('span');
+        tagElement.className = 'entry-tag';
+        tagElement.textContent = tag;
+        tagsElement.appendChild(tagElement);
+    });
+    utilitiesDiv.appendChild(tagsElement);
+    
+    const dateElement = document.createElement('span');
+    dateElement.textContent = `${entry.date}`;
+    dateElement.className = 'date-element';
+    utilitiesDiv.appendChild(dateElement);
+
+    // Edit button
+    const editButton = document.createElement('button');
+    editButton.textContent = 'Edit';
+    editButton.className = 'edit-button';
+    editButton.onclick = async () => {
+        editEntry(entryText, entry);
+    };
+    utilitiesDiv.appendChild(editButton);
+
+    // Delete button
+    const deleteButton = document.createElement('button');
+    deleteButton.textContent = 'Delete';
+    deleteButton.className = 'delete-button';
+    deleteButton.onclick = () => {
+        // Remove markdown file
+        fs.unlinkSync(path.join(entriesFolder, entry.fileName));
+        // Remove entry from entries array
+        const entryIndex = entries.findIndex(e => e.fileName === entry.fileName);
+        if (entryIndex > -1) {
+            entries.splice(entryIndex, 1);
+        }
+        // Remove entry from tags
+        entry.tags.forEach(tag => {
+            const tagIndex = tags[tag].indexOf(entry.fileName);
+            if (tagIndex > -1) {
+                tags[tag].splice(tagIndex, 1);
+            }
+            // If a tag array is empty, delete the tag
+            if (tags[tag].length === 0) {
+                delete tags[tag];
+            }
+        });
+
+        // Delete replies
+        entry.replies.forEach(replyFileName => {
+            fs.unlinkSync(path.join(entriesFolder, replyFileName));
+            // Remove entry from entries array
+            const replyIndex = entries.findIndex(e => e.fileName === replyFileName);
+            if (replyIndex > -1) {
+                entries.splice(replyIndex, 1);
+            }
+        });
+
+        fs.writeFileSync(entriesFile, JSON.stringify(entries));
+        fs.writeFileSync(tagsFile, JSON.stringify(tags));
+        renderAll();
+        console.log(entry.fileName + " deleted");
+    };
+    utilitiesDiv.appendChild(deleteButton);
+    parentDiv.appendChild(utilitiesDiv);
+
+    if (entry.replies.length > 0) {
+        const toggleRepliesButton = document.createElement('button');
+        toggleRepliesButton.innerHTML = '';
+        if(showReplies){
+            toggleRepliesButton.appendChild(angleDownIcon.cloneNode(true));
+        }
+        else{
+            toggleRepliesButton.appendChild(angleUpIcon.cloneNode(true));
+        }
+        toggleRepliesButton.onclick = () => {
+        const replyElements = entryElement.querySelectorAll('.reply-element');
+        replyElements.forEach(replyElement => {
+            if (replyElement.classList.contains('hide')) {
+                replyElement.classList.remove('hide');
+                toggleRepliesButton.innerHTML = '';
+                toggleRepliesButton.appendChild(angleDownIcon.cloneNode(true));
+
+                // Calculate scrollHeight when the reply is visible
+                const textElement = replyElement.querySelector('.text-div div');
+                const seeMoreLink = replyElement.querySelector('.text-div a');
+                const lineHeight = parseFloat(window.getComputedStyle(textElement).lineHeight);
+                if (textElement.scrollHeight > lineHeight * 3) {
+                    seeMoreLink.style.display = 'block';
+                    textElement.classList.add('truncate');
+                }
+            } else {
+                replyElement.classList.add('hide');
+                toggleRepliesButton.innerHTML = '';
+                toggleRepliesButton.appendChild(angleUpIcon.cloneNode(true));
+            }
+        });
+    };
+        parentDiv.insertBefore(toggleRepliesButton, parentDiv.firstChild);
+    }
+    entryElement.appendChild(parentDiv);
+
+    //Display replies
+    entry.replies.forEach(fileName => {
+        const replyElement = document.createElement('div');
+        replyElement.className = 'reply-element';
+        if (!showReplies) {
+            replyElement.classList.add('hide');
+        }
 
         const textDiv = document.createElement('div');
         textDiv.className = 'text-div';
 
         const textElement = document.createElement('div');
-        textElement.innerHTML = marked.parse(entryText);
-        textDiv.appendChild(textElement);
+        const text = fs.readFileSync(path.join(entriesFolder, fileName), 'utf-8');
+        textElement.innerHTML = marked.parse(text);
 
-        //Reply input
-        const replyInput = document.createElement('textarea');
-        replyInput.type = 'text';
-        replyInput.placeholder = 'Write a reply...';
-        replyInput.className = 'mt-2 reply-input border';
-        textDiv.appendChild(replyInput);
-
-        const addReplyButton = document.createElement('button');
-        addReplyButton.textContent = 'Add Reply';
-        addReplyButton.className = 'add-reply bg-blue-500 hover:bg-blue-700 text-white mt-2';
-        addReplyButton.onclick = () => {
-            if(!replyInput.value.trim()){
-                return;
+        // See more
+        const seeMoreLink = document.createElement('a');
+        seeMoreLink.textContent = 'See more';
+        seeMoreLink.href = '#';
+        seeMoreLink.style.display = 'none';
+        seeMoreLink.style.color = 'gray';
+        seeMoreLink.onclick = (e) => {
+            e.preventDefault();
+            if (textElement.classList.contains('truncate')) {
+                textElement.classList.remove('truncate');
+                seeMoreLink.textContent = 'See less';
+            } else {
+                textElement.classList.add('truncate');
+                seeMoreLink.textContent = 'See more';
             }
-            addReply(entry.fileName, replyInput.value);
-            replyInput.value = '';
         };
-        textDiv.appendChild(addReplyButton);
-
-        parentDiv.appendChild(textDiv);
+        textDiv.appendChild(textElement);
+        textDiv.appendChild(seeMoreLink);
+        replyElement.appendChild(textDiv);
 
         const utilitiesDiv = document.createElement('div');
         utilitiesDiv.className = 'utilities-div mt-2';
-
-        //Reply button
-        const replyButton = document.createElement('button');
-        replyButton.textContent = 'Reply';
-        replyButton.className = 'reply-button';
-        replyButton.onclick = () => toggleReplyInput(index);
-        utilitiesDiv.appendChild(replyButton);
 
         const relatedButton = document.createElement('button');
         relatedButton.textContent = 'Related';
         relatedButton.className = 'related-button';
         relatedButton.onclick = () => {
-            const query = { fileName: entry.fileName, text: entryText };
+            const query = { fileName: fileName, text: text };
             fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
             window.location.href = 'related.html';
         };
         utilitiesDiv.appendChild(relatedButton);
-        
-        const tagsElement = document.createElement('div');
-        tagsElement.className = 'entry-tags-container';
-        entry.tags.forEach(tag => {
-            const tagElement = document.createElement('span');
-            tagElement.className = 'entry-tag';
-            tagElement.textContent = tag;
-            tagsElement.appendChild(tagElement);
-        });
-        utilitiesDiv.appendChild(tagsElement);
-        
+
+        const replyEntry = entries.find(entry => entry.fileName === fileName);
         const dateElement = document.createElement('span');
-        dateElement.textContent = `${entry.date}`;
+        dateElement.textContent = `${replyEntry.date}`;
         dateElement.className = 'date-element';
         utilitiesDiv.appendChild(dateElement);
 
@@ -299,7 +490,7 @@ function renderEntries(filterTags = []) {
         editButton.textContent = 'Edit';
         editButton.className = 'edit-button';
         editButton.onclick = async () => {
-            editEntry(entryText, entry);
+            editEntry(text, replyEntry);
         };
         utilitiesDiv.appendChild(editButton);
 
@@ -309,123 +500,36 @@ function renderEntries(filterTags = []) {
         deleteButton.className = 'delete-button';
         deleteButton.onclick = () => {
             // Remove markdown file
-            fs.unlinkSync(path.join(entriesFolder, entry.fileName));
+            fs.unlinkSync(path.join(entriesFolder, fileName));
             // Remove entry from entries array
-            const entryIndex = entries.findIndex(e => e.fileName === entry.fileName);
+            const entryIndex = entries.findIndex(e => e.fileName === fileName);
             if (entryIndex > -1) {
                 entries.splice(entryIndex, 1);
             }
-            // Remove entry from tags
-            entry.tags.forEach(tag => {
-                const tagIndex = tags[tag].indexOf(entry.fileName);
-                if (tagIndex > -1) {
-                    tags[tag].splice(tagIndex, 1);
-                }
-                // If a tag array is empty, delete the tag
-                if (tags[tag].length === 0) {
-                    delete tags[tag];
-                }
-            });
-
-            // Delete replies
-            entry.replies.forEach(replyFileName => {
-                fs.unlinkSync(path.join(entriesFolder, replyFileName));
-                // Remove entry from entries array
-                const replyIndex = entries.findIndex(e => e.fileName === replyFileName);
+            entries.forEach(entry => {
+                const replyIndex = entry.replies.indexOf(fileName);
                 if (replyIndex > -1) {
-                    entries.splice(replyIndex, 1);
+                    entry.replies.splice(replyIndex, 1);
                 }
             });
-
             fs.writeFileSync(entriesFile, JSON.stringify(entries));
-            fs.writeFileSync(tagsFile, JSON.stringify(tags));
-            renderAll();
+            searchEntries(currentQuery, currentTags);
+            console.log(fileName + " deleted");
         };
         utilitiesDiv.appendChild(deleteButton);
 
-        parentDiv.appendChild(utilitiesDiv);
+        replyElement.appendChild(utilitiesDiv);
 
-        entryElement.appendChild(parentDiv);
-
-        //Display replies
-        entry.replies.forEach(fileName => {
-            const replyElement = document.createElement('div');
-            replyElement.className = 'reply-element';
-
-            const textDiv = document.createElement('div');
-            textDiv.className = 'text-div';
-
-            const textElement = document.createElement('div');
-            const text = fs.readFileSync(path.join(entriesFolder, fileName), 'utf-8');
-            textElement.innerHTML = marked.parse(text);
-            textDiv.appendChild(textElement);
-
-            replyElement.appendChild(textDiv);
-
-            const utilitiesDiv = document.createElement('div');
-            utilitiesDiv.className = 'utilities-div mt-2';
-
-            const relatedButton = document.createElement('button');
-            relatedButton.textContent = 'Related';
-            relatedButton.className = 'related-button';
-            relatedButton.onclick = () => {
-                const query = { fileName: fileName, content: text };
-                fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
-                window.location.href = 'related.html';
-            };
-            utilitiesDiv.appendChild(relatedButton);
-
-            const replyEntry = entries.find(entry => entry.fileName === fileName);
-            const dateElement = document.createElement('span');
-            dateElement.textContent = `${replyEntry.date}`;
-            dateElement.className = 'date-element';
-            utilitiesDiv.appendChild(dateElement);
-
-            // Edit button
-            const editButton = document.createElement('button');
-            editButton.textContent = 'Edit';
-            editButton.className = 'edit-button';
-            editButton.onclick = async () => {
-                editEntry(text, replyEntry);
-            };
-            utilitiesDiv.appendChild(editButton);
-
-            // Delete button
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Delete';
-            deleteButton.className = 'delete-button';
-            deleteButton.onclick = () => {
-                // Remove markdown file
-                fs.unlinkSync(path.join(entriesFolder, fileName));
-                // Remove entry from entries array
-                const entryIndex = entries.findIndex(e => e.fileName === fileName);
-                if (entryIndex > -1) {
-                    entries.splice(entryIndex, 1);
-                }
-                entries.forEach(entry => {
-                    const replyIndex = entry.replies.indexOf(fileName);
-                    if (replyIndex > -1) {
-                        entry.replies.splice(replyIndex, 1);
-                    }
-                });
-                fs.writeFileSync(entriesFile, JSON.stringify(entries));
-                renderEntries();
-            };
-            utilitiesDiv.appendChild(deleteButton);
-
-            replyElement.appendChild(utilitiesDiv);
-
-            entryElement.appendChild(replyElement);
-        });
-
-        container.appendChild(entryElement);
+        entryElement.appendChild(replyElement);
     });
+
+    container.appendChild(entryElement);
 }
 function renderTags() {
     const container = document.getElementById('tagsContainer');
     container.innerHTML = '';
     Object.keys(tags).forEach(tag => {
-        const tagElement = document.createElement('span');
+        const tagElement = document.createElement('button');
         tagElement.className = 'tag bg-gray-200 hover:bg-gray-300 rounded px-2 py-1';
         tagElement.textContent = tag;
         tagElement.onclick = () => {
@@ -438,12 +542,13 @@ function renderTags() {
                 tagElement.classList.add('selected');
                 selectedTags.push(tag);
             }
-            renderEntries(selectedTags);
+            currentTags = selectedTags;
+            searchEntries(currentQuery, currentTags);
         };
         container.appendChild(tagElement);
     });
 }
 function renderAll(){
-    renderEntries();
+    searchEntries(currentQuery, currentTags);
     renderTags();
 }

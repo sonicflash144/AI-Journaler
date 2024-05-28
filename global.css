@@ -1,0 +1,39 @@
+body {
+    background-color: #f9fafb;
+    color: #111827;
+    margin-left: 5% !important;
+    margin-right: 5% !important;
+}
+button {
+    user-select: none;
+}
+.related-button {
+    height: 32px;
+    background-color: #14b429; 
+    color: #fefefe;
+    padding: 2px 8px;
+    border-radius: 6px; 
+    transition: background-color 0s; 
+    margin-right: 2rem;
+}
+    .related-button:hover {
+        background-color: #0e791c; 
+    }
+.reply-element {
+    margin-left: 5rem;
+    margin-top: 0.5rem; 
+    border-top: 1px solid #e5e7eb; 
+    padding-top: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+}
+.hide {
+    display: none !important;
+}
+.truncate {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;  
+    overflow: hidden;
+    white-space: normal !important;
+}
