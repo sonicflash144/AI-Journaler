@@ -1,3 +1,5 @@
+# Pileclone
+
 This is an AI-powered journaling app. Your entries are all stored locally, taggable, and easily searchable.
 
 ![image](https://github.com/user-attachments/assets/39e27da9-466a-4e2c-a1e6-726a92a533b4)
