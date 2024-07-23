@@ -18,7 +18,8 @@
             margin-bottom: 0.5rem;
         }
         .text-div {
-            width: 55%;
+            /* width: 55%; */
+            margin-left: 2rem;
             margin-top: 0.5rem;
             display: flex;
             flex-direction: column;
@@ -29,6 +30,11 @@
             display: flex;
             flex-direction: row;
             justify-content: flex-end;
+        }
+        .text-and-chevron-div {
+            display: flex;
+            width: 55%;
+            align-items: center;
         }
         #entriesContainer ul {
             list-style-type: disc;
@@ -113,6 +119,19 @@
         }
         .delete-button{
             height: 32px;
+        }
+        @media screen and (max-width: 1500px){
+            .text-and-chevron-div {
+                width: 40%;
+            }
+            .utilities-div {
+                width: 55%;
+            }
+        }
+        @media screen and (max-width: 1150px){
+            .entry-tags-container{
+                width: 100px;
+            }
         }
     </style>
 </head>

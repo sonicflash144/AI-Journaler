@@ -1,13 +1,13 @@
 require('dotenv').config();
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, MenuItem } = require('electron');
 const fs = require('fs').promises;
 const path = require('node:path');
 require('@electron/remote/main').initialize();
 const enableRemoteModule = require('@electron/remote/main');
-const { ContextChatEngine, Document: LlamaDocument, Settings, VectorStoreIndex, OpenAI, OpenAIEmbedding } = require("llamaindex");
+const { Document: LlamaDocument, Settings, VectorStoreIndex, OpenAI, OpenAIEmbedding } = require("llamaindex");
 const entriesFile = path.join(__dirname, 'user_entries', 'entries.json');
 const entriesFolder = path.join(__dirname, 'user_entries');
-Settings.llm = new OpenAI({ model: "gpt-3.5-turbo", apiKey: process.env.OPENAI_API_KEY });
+Settings.llm = new OpenAI({ model: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY });
 Settings.embedModel = new OpenAIEmbedding();
 Settings.chunkSize = 512;
 var chatEngine;
@@ -37,6 +37,30 @@ const createWindow = () => {
     if(url.endsWith('chat.html')){
       initializeChatEngine();
     }
+  });
+
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    const menu = new Menu()
+
+    // Add each spelling suggestion
+    for (const suggestion of params.dictionarySuggestions) {
+      menu.append(new MenuItem({
+        label: suggestion,
+        click: () => mainWindow.webContents.replaceMisspelling(suggestion)
+      }))
+    }
+
+    // Allow users to add the misspelled word to the dictionary
+    if (params.misspelledWord) {
+      menu.append(
+        new MenuItem({
+          label: 'Add To Dictionary',
+          click: () => mainWindow.webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+        })
+      )
+    }
+
+    menu.popup()
   });
 }
 
@@ -72,22 +96,14 @@ async function initializeChatEngine() {
   const index = await VectorStoreIndex.fromDocuments(documents);
   retriever = index.asRetriever();
   retriever.similarityTopK = 5;
+  /*
   chatEngine = new ContextChatEngine({ 
       retriever, 
       contextSystemPrompt: customContextSystemPrompt
   });
+  */
   console.log("Initialized!");
 }
-
-ipcMain.handle('sendMessage', async (event, query) => {
-    const stream = await chatEngine.chat({ message: query, stream: true });
-    let response = '';
-    for await (const chunk of stream) {
-        response += chunk.response;
-    }
-    return response;
-});
-
 ipcMain.handle('getRelatedEntries', async (event, query) => {
   await initializeChatEngine();
   const sourceNodes = await retriever.retrieve({ query: query });
@@ -96,8 +112,17 @@ ipcMain.handle('getRelatedEntries', async (event, query) => {
       fileName: node.node.relationships['SOURCE'].nodeId
   }));
 });
-
+/*
 function customContextSystemPrompt({ context = '' }) {
-  const SYSTEM_PROMPT = `You are an AI within the user's personal journal. You have access to the user's journal entries as context. Answer the user's questions based on the context provided. Don't answer in lists all the time. You are a wise librarian of the user's thoughts, providing advice and counsel. Try to keep responses consise. \nCurrent date and time: ${new Date().toISOString()} \nSome relevant past journal entries for context: ${context}`;
+  const SYSTEM_PROMPT = `You are an AI within the user's personal journal. You have access to the user's journal entries as context. Provide personalized responses to the user's questions based on the context provided. Don't answer in lists all the time. Try to keep responses consise. \nCurrent date and time: ${new Date().toISOString()} \nSome relevant past journal entries for context: ${context}`;
   return SYSTEM_PROMPT;
 }
+ipcMain.handle('sendMessage', async (event, query) => {
+  const stream = await chatEngine.chat({ message: query, stream: true });
+  let response = '';
+  for await (const chunk of stream) {
+      response += chunk.response;
+  }
+  return response;
+});
+*/

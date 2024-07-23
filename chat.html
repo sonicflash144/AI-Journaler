@@ -40,6 +40,14 @@
     <button onclick="window.location.href='index.html'" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 mt-2 mb-2 ml-2" style="float: right;">Home</button>
     <div class="container mx-auto">
         <h1 class="text-2xl font-bold text-center mb-6">Chat</h1>
+        <div class="flex justify-center mb-4">
+            <label for="numContextSelect" class="mr-2">Number of recent entries for context:</label>
+            <select id="numContextSelect" class="form-select mt-1 block">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+            </select>
+        </div>
         <div id="messages" class="flex flex-col"></div>
         <div class="mt-4 flex">
             <textarea id="userInput" class="form-input mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="Type your message here..." rows="1"></textarea>
@@ -47,6 +55,6 @@
         </div>
     </div>
 
-    <script src="./lib/llama_chat.js"></script>
+    <script src="chat.js"></script>
 </body>
 </html>

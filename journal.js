@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const marked = require('marked');
 const VISION_API_KEY = process.env.VISION_API_KEY;
-
 async function analyzeSentiment(text) {
     const response = await fetch(`https://language.googleapis.com/v2/documents:analyzeSentiment?key=${VISION_API_KEY}`, {
         method: 'POST',
@@ -90,7 +89,8 @@ async function addReply(parentFileName, replyText) {
     renderAll();
     newEntry.sentimentScore = await analyzeSentiment(replyText);
     fs.writeFileSync(entriesFile, JSON.stringify(entries));
-    console.log(fileName + " added");
+
+    console.log("Reply " + fileName + " added");
 }
 async function addEntry() {
     const entryText = document.getElementById('entryInput').value;
@@ -131,9 +131,11 @@ async function addEntry() {
     }
     fs.writeFileSync(entriesFile, JSON.stringify(entries));
     fs.writeFileSync(tagsFile, JSON.stringify(tags));
+
     console.log(fileName + " added");
 }
 function editEntry(entryText, entry) {
+
     modal.style.display = "block";
     textarea.value = entryText;
 
@@ -189,9 +191,12 @@ function editEntry(entryText, entry) {
         
         modal.style.display = "none";
         renderAll();
+
         entry.sentimentScore = await analyzeSentiment(newText);
         fs.writeFileSync(entriesFile, JSON.stringify(entries));
         fs.writeFileSync(tagsFile, JSON.stringify(tags));
+
+        console.log(entry.fileName + " edited")
     };
 }
 
@@ -215,42 +220,73 @@ function searchEntries(query, tags) {
 }
 function renderEntries(filterTags=[], filteredEntries=[-1]) {
     container.innerHTML = '';
+    //Search bar is empty, show all entries
     if(filteredEntries[0] === -1){
         entries.filter(entry => entry.parent === "" && (filterTags.length === 0 || filterTags.every(tag => entry.tags.includes(tag))))    
         .sort((a, b) => new Date(b.date) - new Date(a.date))
-        .forEach((entry, index) => {
-            renderEntry(entry, index);
+        .forEach(entry => {
+            const entryElement = document.createElement('div');
+            entryElement.className = 'entry-element p-4 border mb-2';
+            entryElement.setAttribute('data-filename', entry.fileName);
+            container.appendChild(entryElement);
         });
     }
+    //Search bar is not empty, show only matching entries
     else{
         const renderedEntries = new Set();
         filteredEntries.filter(entry => filterTags.length === 0 || filterTags.every(tag => entry.tags.includes(tag)))
-        .forEach((entry, index) => {
-            if(entry.parent === ""){
-                if (!renderedEntries.has(entry.fileName)) {
-                    renderEntry(entry, index);
-                    renderedEntries.add(entry.fileName);
-                }
+        .forEach(entry => {
+            let fileNameToUse = entry.fileName;
+            const entryElement = document.createElement('div');
+            if(entry.parent === "" && !renderedEntries.has(entry.fileName)){
+                renderedEntries.add(entry.fileName);
             }
             else{
                 const parentEntry = entries.find(e => e.fileName === entry.parent);
                 if (parentEntry && !renderedEntries.has(parentEntry.fileName)) {
-                    renderEntry(parentEntry, entries.indexOf(parentEntry), true);
+                    entryElement.setAttribute('data-showReplies', true);
                     renderedEntries.add(parentEntry.fileName);
+                    fileNameToUse = parentEntry.fileName;
                 }
+            }
+            entryElement.className = 'entry-element p-4 border mb-2';
+            entryElement.setAttribute('data-filename', fileNameToUse);
+            container.appendChild(entryElement);
+        });
+    }
+    lazyLoad();
+}
+function lazyLoad(){
+    let allDOMEntries = document.querySelectorAll('.entry-element');
+    let config = {root: null, rootMargin: '0px', threshold: 0.75};  
+
+    function intersect(observerEntries, observer){
+        observerEntries.forEach((entry, replyIndex) => {
+            if(entry.isIntersecting){
+                const entryElement = entry.target;
+                let entryIndex = entries.findIndex(e => e.fileName === entryElement.getAttribute('data-filename'));
+                entryElement.setAttribute('data-index', entryIndex);
+                entryElement.setAttribute('data-reply-index', replyIndex);
+                let showReplies = entryElement.getAttribute('data-showReplies') === 'true';
+                renderEntry(entries[entryIndex], entryElement, showReplies);
+                observer.unobserve(entry.target);
             }
         });
     }
-    
+    const observer = new IntersectionObserver(intersect, config);
+    allDOMEntries.forEach(entry => {
+        observer.observe(entry);
+    });
 }
-function renderEntry(entry, index, showReplies=false){
-    const entryText = fs.readFileSync(path.join(entriesFolder, entry.fileName), 'utf-8');
 
-    const entryElement = document.createElement('div');
-    entryElement.className = 'entry-element p-4 border mb-2';
+function renderEntry(entry, entryElement, showReplies=false){
+    const entryText = fs.readFileSync(path.join(entriesFolder, entry.fileName), 'utf-8');
 
     const parentDiv = document.createElement('div');
     parentDiv.className = 'parent-div';
+
+    const textAndCheveronDiv = document.createElement('div');
+    textAndCheveronDiv.className = 'text-and-chevron-div';
 
     const textDiv = document.createElement('div');
     textDiv.className = 'text-div';
@@ -258,6 +294,7 @@ function renderEntry(entry, index, showReplies=false){
     const textElement = document.createElement('div');
     textElement.innerHTML = marked.parse(entryText);
     textElement.classList.add('truncate');
+    entryElement.textElement = textElement;
 
     //See more
     const seeMoreLink = document.createElement('a');
@@ -305,9 +342,9 @@ function renderEntry(entry, index, showReplies=false){
         addReply(entry.fileName, replyInput.value);
         replyInput.value = '';
     };
-    textDiv.appendChild(addReplyButton);
 
-    parentDiv.appendChild(textDiv);
+    textDiv.appendChild(addReplyButton);
+    textAndCheveronDiv.appendChild(textDiv);
 
     const utilitiesDiv = document.createElement('div');
     utilitiesDiv.className = 'utilities-div mt-2';
@@ -316,7 +353,8 @@ function renderEntry(entry, index, showReplies=false){
     const replyButton = document.createElement('button');
     replyButton.textContent = 'Reply';
     replyButton.className = 'reply-button';
-    replyButton.onclick = () => toggleReplyInput(index);
+    let replyIndex = entryElement.getAttribute('data-reply-index');
+    replyButton.onclick = () => toggleReplyInput(replyIndex);
     utilitiesDiv.appendChild(replyButton);
 
     const relatedButton = document.createElement('button');
@@ -427,8 +465,10 @@ function renderEntry(entry, index, showReplies=false){
             }
         });
     };
-        parentDiv.insertBefore(toggleRepliesButton, parentDiv.firstChild);
+        textAndCheveronDiv.insertBefore(toggleRepliesButton, textAndCheveronDiv.firstChild);
     }
+
+    parentDiv.insertBefore(textAndCheveronDiv, parentDiv.firstChild);
     entryElement.appendChild(parentDiv);
 
     //Display replies
