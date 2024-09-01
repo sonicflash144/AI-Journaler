@@ -4,5 +4,5 @@ user_entries_2/
 query.json
 dist/
 lib/
-.env
 out/
+.env

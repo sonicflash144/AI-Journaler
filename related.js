@@ -1,35 +1,36 @@
-const fs = require('fs');
-const path = require('path');
-const marked = require('marked');
-const { ipcRenderer } = require('electron');
+const fs = window.electron.fs;
+const path = window.electron.path;
+const marked = window.electron.marked;
+const ipcRenderer = window.electron.ipcRenderer;
 
-const container = document.getElementById('entriesContainer');
-const entriesFile = path.join(__dirname, 'user_entries', 'entries.json');
-const entriesFolder = path.join(__dirname, 'user_entries');
-let entries = [];
 let isOriginal = true;
 
-if (fs.existsSync(entriesFile)) {
-    const data = JSON.parse(fs.readFileSync(entriesFile, 'utf-8'));
-    entries = data.map(entry => {
-        return { ...entry};
-    });
-}
-if (!fs.existsSync(entriesFolder)){
-    fs.mkdirSync(entriesFolder);
-}
-
-(async () => {
-    const queryFile = path.join(__dirname, 'query.json');
-    const query = JSON.parse(fs.readFileSync(queryFile, 'utf-8'));
-    let sourceNodes = await ipcRenderer.invoke('getRelatedEntries', query.text);
-    sourceNodes = sourceNodes.filter(node => node.score >= 0.75);
-    const relatedEntries = sourceNodes.map(node => 
-        entries.find(entry => entry.fileName === node.fileName)
-    ).filter(entry => entry !== undefined);
-    renderEntries(relatedEntries);
-})();
-
+const container = document.getElementById('entriesContainer');
+let entries = [];
+var entriesFile, entriesFolder;
+window.electron.app.getPath('userData').then(userDataPath => {
+    entriesFile = path.join(userDataPath, 'user_entries', 'entries.json');
+    entriesFolder = path.join(userDataPath, 'user_entries');
+    if (fs.existsSync(entriesFile)) {
+        const data = JSON.parse(fs.readFileSync(entriesFile, 'utf-8'));
+        entries = data.map(entry => {
+            return { ...entry};
+        });
+    }
+    if (!fs.existsSync(entriesFolder)){
+        fs.mkdirSync(entriesFolder);
+    }
+    (async () => {
+        const queryFile = path.join(userDataPath, 'query.json');
+        const query = JSON.parse(fs.readFileSync(queryFile, 'utf-8'));
+        let sourceNodes = await ipcRenderer.invoke('getRelatedEntries', query.text);
+        sourceNodes = sourceNodes.filter(node => node.score >= 0.75);
+        const relatedEntries = sourceNodes.map(node => 
+            entries.find(entry => entry.fileName === node.fileName)
+        ).filter(entry => entry !== undefined);
+        renderEntries(relatedEntries);
+    })();
+});
 function renderEntries(entries) {
     container.innerHTML = '';
     entries.forEach(entry => {
@@ -59,7 +60,7 @@ function renderEntries(entries) {
             relatedButton.className = 'related-button';
             relatedButton.onclick = () => {
                 const query = { fileName: entry.fileName, text: entryText };
-                fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
+                fs.writeFileSync(path.join(userDataPath, 'query.json'), JSON.stringify(query));
                 window.location.href = 'related.html';
             };
             utilitiesDiv.appendChild(relatedButton);

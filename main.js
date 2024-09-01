@@ -6,10 +6,12 @@ const path = require('node:path');
 require('@electron/remote/main').initialize();
 const enableRemoteModule = require('@electron/remote/main');
 const { Document: LlamaDocument, Settings, VectorStoreIndex, OpenAI, OpenAIEmbedding } = require("llamaindex");
-const entriesFile = path.join(__dirname, 'user_entries', 'entries.json');
-const entriesFolder = path.join(__dirname, 'user_entries');
+
+const userDataPath = app.getPath('userData');
+const entriesFile = path.join(userDataPath, 'user_entries', 'entries.json');
+const entriesFolder = path.join(userDataPath, 'user_entries');
 Settings.llm = new OpenAI({ model: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY });
-Settings.embedModel = new OpenAIEmbedding();
+Settings.embedModel = new OpenAIEmbedding({apiKey: process.env.OPENAI_API_KEY});
 Settings.chunkSize = 512;
 var retriever;
 
@@ -20,7 +22,7 @@ const createWindow = () => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: true
     }
   });
   mainWindow.maximize();
@@ -110,6 +112,9 @@ ipcMain.handle('getRelatedEntries', async (event, query) => {
       score: node.score,
       fileName: node.node.relationships['SOURCE'].nodeId
   }));
+});
+ipcMain.handle('app-get-path', (event, name) => {
+  return app.getPath(name);
 });
 /*
 function customContextSystemPrompt({ context = '' }) {

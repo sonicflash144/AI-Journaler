@@ -1,20 +1,45 @@
-const fs = require('fs');
-const path = require('path');
-const marked = require('marked');
-import CalHeatmap from 'cal-heatmap';
-import 'cal-heatmap/cal-heatmap.css';
+const fs = window.electron.fs;
+const path = window.electron.path;
+const marked = window.electron.marked;
+
 const angleUpIcon = document.createElement('i');
 angleUpIcon.className = 'fas fa-angle-up';
 const angleDownIcon = document.createElement('i');
 angleDownIcon.className = 'fas fa-angle-down';
-
 const container = document.getElementById('entriesContainer');
 const calHeatmapDiv = document.getElementById('cal-heatmap');
-const entriesFile = path.join(__dirname, 'user_entries', 'entries.json');
-const entriesFolder = path.join(__dirname, 'user_entries');
-let entries = [];
-let clickedDate;
 
+var entriesFile, entriesFolder;
+let entries = [];
+window.electron.app.getPath('userData').then(userDataPath => {
+    entriesFile = path.join(userDataPath, 'user_entries', 'entries.json');
+    entriesFolder = path.join(userDataPath, 'user_entries');
+    if (fs.existsSync(entriesFile)) {
+        const data = JSON.parse(fs.readFileSync(entriesFile, 'utf-8'));
+        entries = data.map(entry => {
+            return { ...entry};
+        });
+    }
+    if (!fs.existsSync(entriesFolder)){
+        fs.mkdirSync(entriesFolder);
+    } 
+    var data = entries.reduce((acc, entry) => {
+        const date = new Date(entry.date);
+        date.setHours(0, 0, 0, 0);
+        const timestamp = date.getTime();
+        acc[timestamp] = (acc[timestamp] || []).concat(entry.sentimentScore);
+        return acc;
+    }, {});
+    
+    // Convert data to an array of objects
+    data = Object.entries(data).map(([date, values]) => {
+        const averageValue = values.reduce((a, b) => a + b, 0) / values.length;
+        return { date: parseInt(date), value: averageValue };
+    });   
+    createHeatmap(data);
+});
+
+let clickedDate;
 const contextBtn = document.getElementById('toggleContextButton');
 let showContext = false;
 contextBtn.onclick = function() {
@@ -23,30 +48,6 @@ contextBtn.onclick = function() {
     contextBtn.textContent = showContext ? 'Hide Context' : 'Show Context';
     filterEntries(clickedDate);
 }
-
-if (fs.existsSync(entriesFile)) {
-    const data = JSON.parse(fs.readFileSync(entriesFile, 'utf-8'));
-    entries = data.map(entry => {
-        return { ...entry};
-    });
-}
-if (!fs.existsSync(entriesFolder)){
-    fs.mkdirSync(entriesFolder);
-}
-
-var data = entries.reduce((acc, entry) => {
-    const date = new Date(entry.date);
-    date.setHours(0, 0, 0, 0);
-    const timestamp = date.getTime();
-    acc[timestamp] = (acc[timestamp] || []).concat(entry.sentimentScore);
-    return acc;
-}, {});
-
-// Convert data to an array of objects
-data = Object.entries(data).map(([date, values]) => {
-    const averageValue = values.reduce((a, b) => a + b, 0) / values.length;
-    return { date: parseInt(date), value: averageValue };
-});
 
 function createHeatmap(data){
     const monthsPerPage = 3;
@@ -106,7 +107,6 @@ function createHeatmap(data){
         filterEntries(clickedDate);
     });
 }
-createHeatmap(data);
 
 function filterEntries(clickedDate) {
     container.innerHTML = '';
@@ -192,7 +192,7 @@ function renderEntry(entry, showReplies=showContext) {
     relatedButton.className = 'related-button';
     relatedButton.onclick = () => {
         const query = { fileName: entry.fileName, text: entryText };
-        fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
+        fs.writeFileSync(path.join(userDataPath, 'query.json'), JSON.stringify(query));
         window.location.href = 'related.html';
     };
     utilitiesDiv.appendChild(relatedButton);
@@ -290,7 +290,7 @@ function renderEntry(entry, showReplies=showContext) {
         relatedButton.className = 'related-button';
         relatedButton.onclick = () => {
             const query = { fileName: fileName, text: text };
-            fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
+            fs.writeFileSync(path.join(userDataPath, 'query.json'), JSON.stringify(query));
             window.location.href = 'related.html';
         };
         utilitiesDiv.appendChild(relatedButton);

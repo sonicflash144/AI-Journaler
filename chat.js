@@ -1,24 +1,19 @@
-require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
-
+const fs = window.electron.fs;
+const path = window.electron.path;
 const OPENROUTER_KEY = process.env.OPENROUTER_KEY;
 var systemPrompt;
 const input = document.getElementById('userInput');
 const messagesContainer = document.getElementById('messages');
 const sendButton = document.getElementById('sendButton');
-const entriesFile = path.join(__dirname, 'user_entries', 'entries.json');
-const entriesFolder = path.join(__dirname, 'user_entries');
+
 let entries = [];
 let conversationHistory = [];
-
 var num_context = 10;
-document.getElementById('numContextSelect').addEventListener('change', function() {
-    num_context = parseInt(this.value);
-    updateSystemPrompt();
-    console.log('num_context set to:', num_context);
-});
-function updateSystemPrompt(){
+var entriesFile, entriesFolder;
+
+window.electron.app.getPath('userData').then(userDataPath => {
+    entriesFile = path.join(userDataPath, 'user_entries', 'entries.json');
+    entriesFolder = path.join(userDataPath, 'user_entries');
     if (fs.existsSync(entriesFile)) {
         const data = JSON.parse(fs.readFileSync(entriesFile, 'utf-8'));
         entries = data.map(entry => {
@@ -34,8 +29,13 @@ function updateSystemPrompt(){
     }
     
     systemPrompt = `You are a journaling assistant that helps the user reflect and seed new ideas. Keep your responses concise. Here are the user's ${num_context} most recent journal entries for context:\n\n${entries.map(entry => `Date: ${entry.date}\nSentiment Score: ${entry.sentimentScore}\n${entry.text}`).join('\n\n')}`;
-}
-updateSystemPrompt();
+});
+
+document.getElementById('numContextSelect').addEventListener('change', function() {
+    num_context = parseInt(this.value);
+    updateSystemPrompt();
+    console.log('num_context set to:', num_context);
+});
 
 sendButton.addEventListener('click', async function() {
     sendMessage();

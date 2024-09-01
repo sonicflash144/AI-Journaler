@@ -1,8 +1,9 @@
-require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
-const marked = require('marked');
+const fs = window.electron.fs;
+const path = window.electron.path;
+const marked = window.electron.marked;
+const app = window.electron.app;
 const VISION_API_KEY = process.env.VISION_API_KEY;
+var entriesFile, tagsFile, entriesFolder;
 async function analyzeSentiment(text) {
     const response = await fetch(`https://language.googleapis.com/v2/documents:analyzeSentiment?key=${VISION_API_KEY}`, {
         method: 'POST',
@@ -26,15 +27,36 @@ async function analyzeSentiment(text) {
     }
 }
 
+let entries = [];
+let tags = {};
+window.electron.app.getPath('userData').then(userDataPath => {
+    entriesFile = path.join(userDataPath, 'user_entries', 'entries.json');
+    tagsFile = path.join(userDataPath, 'user_entries', 'tags.json');
+    entriesFolder = path.join(userDataPath, 'user_entries');
+    queryFile = path.join(userDataPath, 'query.json');
+    // Load local entries and tags
+    if (fs.existsSync(entriesFile)) {
+        const data = JSON.parse(fs.readFileSync(entriesFile, 'utf-8'));
+        entries = data.map(entry => {
+            return { ...entry};
+        });
+    }
+    if (fs.existsSync(tagsFile)) {
+        const data = JSON.parse(fs.readFileSync(tagsFile, 'utf-8'));
+        tags = data;
+    }
+    if (!fs.existsSync(entriesFolder)){
+        fs.mkdirSync(entriesFolder);
+    }
+    renderAll();
+});
+
 const angleUpIcon = document.createElement('i');
 angleUpIcon.className = 'fas fa-angle-up';
 const angleDownIcon = document.createElement('i');
 angleDownIcon.className = 'fas fa-angle-down';
 
 const container = document.getElementById('entriesContainer');
-const entriesFile = path.join(__dirname, 'user_entries', 'entries.json');
-const tagsFile = path.join(__dirname, 'user_entries', 'tags.json');
-const entriesFolder = path.join(__dirname, 'user_entries');
 const searchBar = document.getElementById('searchBar');
 var currentQuery = "";
 var currentTags = [];
@@ -58,25 +80,6 @@ function toggleReplyInput(index) {
     replyInputs[index].style.display = replyInputs[index].style.display === 'block' ? 'none' : 'block';
     addReplyButtons[index].style.display = addReplyButtons[index].style.display === 'block' ? 'none' : 'block';
 }
-
-let entries = [];
-let tags = {};
-// Load local entries and tags
-if (fs.existsSync(entriesFile)) {
-    const data = JSON.parse(fs.readFileSync(entriesFile, 'utf-8'));
-    entries = data.map(entry => {
-        const entryText = fs.readFileSync(path.join(entriesFolder, entry.fileName), 'utf-8');
-        return { ...entry};
-    });
-}
-if (fs.existsSync(tagsFile)) {
-    const data = JSON.parse(fs.readFileSync(tagsFile, 'utf-8'));
-    tags = data;
-}
-if (!fs.existsSync(entriesFolder)){
-    fs.mkdirSync(entriesFolder);
-}
-renderAll();
 
 async function addReply(parentFileName, replyText) {
     const entryDate = new Date().toLocaleString();
@@ -362,7 +365,7 @@ function renderEntry(entry, entryElement, showReplies=false){
     relatedButton.className = 'related-button';
     relatedButton.onclick = () => {
         const query = { fileName: entry.fileName, text: entryText };
-        fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
+        fs.writeFileSync(queryFile, JSON.stringify(query));
         window.location.href = 'related.html';
     };
     utilitiesDiv.appendChild(relatedButton);
@@ -514,7 +517,7 @@ function renderEntry(entry, entryElement, showReplies=false){
         relatedButton.className = 'related-button';
         relatedButton.onclick = () => {
             const query = { fileName: fileName, text: text };
-            fs.writeFileSync(path.join(__dirname, 'query.json'), JSON.stringify(query));
+            fs.writeFileSync(queryFile, JSON.stringify(query));
             window.location.href = 'related.html';
         };
         utilitiesDiv.appendChild(relatedButton);

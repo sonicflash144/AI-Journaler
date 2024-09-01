@@ -1,4 +1,5 @@
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
+const path = require('path');
 
 module.exports = {
     target: 'electron-renderer',
@@ -14,9 +15,19 @@ module.exports = {
         rules: [
             {
                 test: /\.css$/,
+                loader: 'babel-loader',
+                options: {
+                    presets: ['@babel/preset-env']
+                }
+            },
+            {
+                test: /\.css$/,
                 use: ['style-loader', 'css-loader']
             }
         ]
+    },
+    resolve: {
+        extensions: ['.js']
     },
     plugins: [
         new NodePolyfillPlugin(),
