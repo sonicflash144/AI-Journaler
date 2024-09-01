@@ -10,8 +10,8 @@ const { Document: LlamaDocument, Settings, VectorStoreIndex, OpenAI, OpenAIEmbed
 const userDataPath = app.getPath('userData');
 const entriesFile = path.join(userDataPath, 'user_entries', 'entries.json');
 const entriesFolder = path.join(userDataPath, 'user_entries');
-Settings.llm = new OpenAI({ model: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY });
-Settings.embedModel = new OpenAIEmbedding({apiKey: process.env.OPENAI_API_KEY});
+Settings.llm = new OpenAI({ model: "gpt-4o-mini", apiKey: "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" });
+Settings.embedModel = new OpenAIEmbedding({apiKey: "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"});
 Settings.chunkSize = 512;
 var retriever;
 
@@ -32,7 +32,7 @@ const createWindow = () => {
   enableRemoteModule.enable(mainWindow.webContents);
 
   // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  //mainWindow.webContents.openDevTools();
 
   mainWindow.webContents.on('did-navigate', (event, url) => {
     if(url.endsWith('chat.html')){
