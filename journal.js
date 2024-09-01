@@ -570,7 +570,7 @@ function renderTags() {
     container.innerHTML = '';
     Object.keys(tags).forEach(tag => {
         const tagElement = document.createElement('button');
-        tagElement.className = 'tag bg-gray-200 hover:bg-gray-300 rounded px-2 py-1';
+        tagElement.className = 'tag bg-gray-200 hover:bg-gray-300 rounded px-2 py-1 mb-2';
         tagElement.textContent = tag;
         tagElement.onclick = () => {
             const selectedTags = Array.from(document.querySelectorAll('.tag.selected')).map(t => t.textContent);

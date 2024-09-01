@@ -30,7 +30,7 @@ function updateSystemPrompt(){
             num_context = entries.length;
         }
     
-        entries = entries.slice(0, num_context);
+        entries = entries.slice(-num_context);
     }
     
     systemPrompt = `You are a journaling assistant that helps the user reflect and seed new ideas. Keep your responses concise. Here are the user's ${num_context} most recent journal entries for context:\n\n${entries.map(entry => `Date: ${entry.date}\nSentiment Score: ${entry.sentimentScore}\n${entry.text}`).join('\n\n')}`;

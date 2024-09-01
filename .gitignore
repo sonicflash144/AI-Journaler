@@ -1,5 +1,8 @@
 node_modules/
 user_entries/
+user_entries_2/
+query.json
 dist/
 lib/
 .env
+out/

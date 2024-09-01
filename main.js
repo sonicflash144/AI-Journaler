@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { app, BrowserWindow, ipcMain, Menu, MenuItem } = require('electron');
+if (require('electron-squirrel-startup')) app.quit();
 const fs = require('fs').promises;
 const path = require('node:path');
 require('@electron/remote/main').initialize();
@@ -10,7 +11,6 @@ const entriesFolder = path.join(__dirname, 'user_entries');
 Settings.llm = new OpenAI({ model: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY });
 Settings.embedModel = new OpenAIEmbedding();
 Settings.chunkSize = 512;
-var chatEngine;
 var retriever;
 
 const createWindow = () => {
